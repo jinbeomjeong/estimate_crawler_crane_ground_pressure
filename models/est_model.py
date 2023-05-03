@@ -13,10 +13,10 @@ class GroundPressureModel(pl.LightningModule):
         self.h2_neuron = int(round(n_h2))
 
         self.input_layer = [nn.Linear(n_input, self.h1_neuron), nn.ReLU()]
-        self.hidden_layer_1 = [nn.Linear(self.h1_neuron, self.h2_neuron), nn.ReLU()]
-        self.output_layer = [nn.Linear(self.h2_neuron, n_output)]
+        self.hidden_layer_1 = [nn.Linear(self.h1_neuron, self.h1_neuron), nn.ReLU()]
+        self.output_layer = [nn.Linear(self.h1_neuron, n_output)]
 
-        self.model = nn.Sequential(*self.input_layer, *self.hidden_layer_1, *self.output_layer)
+        self.model = nn.Sequential(*self.input_layer, *self.hidden_layer_1, *self.hidden_layer_1, *self.hidden_layer_1, *self.output_layer)
 
         self.loss_func = nn.MSELoss()
 
