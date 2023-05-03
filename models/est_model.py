@@ -14,18 +14,19 @@ class GroundPressureModel(pl.LightningModule):
 
         self.input_layer = [nn.Linear(n_input, self.h1_neuron), nn.ReLU()]
         self.hidden_layer_1 = [nn.Linear(self.h1_neuron, self.h1_neuron), nn.ReLU()]
+        self.hidden_layer_2 = [nn.Linear(self.h1_neuron, self.n_input), nn.ReLU()]
         self.output_layer = [nn.Linear(self.h1_neuron, n_output)]
 
-        self.model = nn.Sequential(*self.input_layer, *self.hidden_layer_1, *self.hidden_layer_1, *self.hidden_layer_1, *self.output_layer)
-
+        self.basic_model = nn.Sequential(*self.input_layer, *self.hidden_layer_1, *self.hidden_layer_1, *self.hidden_layer_1, *self.output_layer)
+        self.shortcut_model = nn.Sequential(nn.Linear(self.n_input, self.n_output))
         self.loss_func = nn.MSELoss()
 
     def forward(self, x):
-        return self.model(x)
+        return self.basic_model(x) + self.shortcut_model(x)
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        y_hat = self.model(x)
+        y_hat = self.forward(x)
         loss = self.loss_func(y_hat, y)
         self.log('train_loss', loss)
 
@@ -33,7 +34,7 @@ class GroundPressureModel(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        val_pred = self.model(x)
+        val_pred = self.forward(x)
         r2_value = r2_score(y.cpu().detach().numpy(), val_pred.cpu().detach().numpy())
         self.log("r2_score", r2_value)
 
