@@ -1,44 +1,51 @@
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
+from torcheval.metrics import R2Score
 from sklearn.metrics import r2_score
+
+class BasicBlock(pl.LightningModule):
+    def __init__(self, n_input: int, n_output: int):
+        super().__init__()
+        self.n_neuron = n_input*n_output
+        self.basic_block = nn.Sequential(nn.Linear(self.n_neuron, self.n_neuron), nn.Linear(self.n_neuron, self.n_neuron))
+        self.shortcut_block = nn.Sequential()
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        return self.relu(self.basic_block(x) + self.shortcut_block(x))
 
 
 class GroundPressureModel(pl.LightningModule):
-    def __init__(self, n_input, n_h1, n_h2, n_output):
+    def __init__(self, n_input: int, n_layer: int, n_output: int):
         super().__init__()
-        self.n_input = n_input
-        self.n_output = n_output
-        self.h1_neuron = int(round(n_h1))
-        self.h2_neuron = int(round(n_h2))
-
-        self.input_layer = [nn.Linear(n_input, self.h1_neuron), nn.ReLU()]
-        self.hidden_layer_1 = [nn.Linear(self.h1_neuron, self.h1_neuron), nn.ReLU()]
-        self.hidden_layer_2 = [nn.Linear(self.h1_neuron, self.n_input), nn.ReLU()]
-        self.output_layer = [nn.Linear(self.h1_neuron, n_output)]
-
-        self.basic_model = nn.Sequential(*self.input_layer, *self.hidden_layer_1, *self.hidden_layer_1, *self.hidden_layer_1, *self.output_layer)
-        self.shortcut_model = nn.Sequential(nn.Linear(self.n_input, self.n_output))
-        self.loss_func = nn.MSELoss()
+        block = BasicBlock(n_input, n_output)
+        self.loss = nn.MSELoss()
+        self.metric = R2Score()
+        self.layer = [block]*n_layer
+        self.model = nn.Sequential(nn.Linear(n_input, n_input*n_output), *self.layer, nn.Linear(n_input*n_output, n_output))
+        self.relu = nn.ReLU()
 
     def forward(self, x):
-        return self.basic_model(x) + self.shortcut_model(x)
+
+        return self.model(x)
 
     def training_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self.forward(x)
-        loss = self.loss_func(y_hat, y)
-        self.log('train_loss', loss)
+        loss_val = self.loss(y_hat, y)
+        self.log('train_loss', loss_val)
+        print(r2_score(y.cpu().detach().numpy(), y_hat.cpu().detach().numpy()))
+        return loss_val
 
-        return loss
-
+    '''
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        val_pred = self.forward(x)
-        r2_value = r2_score(y.cpu().detach().numpy(), val_pred.cpu().detach().numpy())
-        self.log("r2_score", r2_value)
-
-        return r2_value
+        y_hat = self.forward(x)
+        self.metric.update(y_hat, y)
+        score = self.metric.compute()
+        self.log('val_r2score', score.item())
+    '''
 
     # def test_step(self, batch, batch_idx):
     # x, y = batch

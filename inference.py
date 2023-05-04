@@ -6,13 +6,12 @@ from models.est_model import GroundPressureModel
 with open('.' + os.sep + os.path.join('models', 'params_dnn_20220207-012403.json'), 'r') as file:
     hyper_params = json.load(file)
 
-n_input = hyper_params['n_of_inputs']
-h1_neuron = hyper_params['h1_neuron']
-h2_neuron = hyper_params['h2_neuron']
-n_output = hyper_params['n_of_outputs']
+n_inputs = hyper_params['n_of_inputs']
+n_outputs = hyper_params['n_of_outputs']
+n_layers = hyper_params['n_of_layers']
 
 
-model = GroundPressureModel(n_input, h1_neuron, h2_neuron, n_output)
+model = GroundPressureModel(n_inputs, n_layers, n_outputs)
 
 
 gpu = torch.device('cpu')
