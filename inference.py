@@ -1,6 +1,6 @@
 import torch, os, json
 import numpy as np
-from models.est_model import GroundPressureModel
+from models.est_model import ResidualRegression, DNNRegression
 
 
 with open('.' + os.sep + os.path.join('models', 'params_dnn_20220207-012403.json'), 'r') as file:
@@ -11,7 +11,7 @@ n_outputs = hyper_params['n_of_outputs']
 n_layers = hyper_params['n_of_layers']
 
 
-model = GroundPressureModel(n_inputs, n_layers, n_outputs)
+model = DNNRegression(n_inputs, n_layers, n_outputs)
 
 
 gpu = torch.device('cpu')

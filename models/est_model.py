@@ -36,7 +36,6 @@ class ResidualRegression(pl.LightningModule):
 
         self.model = nn.Sequential(*self.layers)
         self.loss = nn.MSELoss()
-        print(self.model)
 
     def forward(self, x):
         return self.model(x)
@@ -75,11 +74,20 @@ class ResidualRegression(pl.LightningModule):
 class DNNRegression(pl.LightningModule):
     def __init__(self, n_input: int, n_hidden: int, n_output: int):
         super().__init__()
-        self.layer_1 = nn.Linear(n_input, n_hidden)
-        self.layer_2 = nn.Linear(n_hidden, n_hidden)
-        self.layer_3 = nn.Linear(n_hidden, n_output)
+        self.input_layer = nn.Linear(n_input, n_input*n_output)
+        self.output_layer = nn.Linear(n_input*n_output, n_output)
         self.active = nn.ReLU()
-        self.model = nn.Sequential(self.layer_1, self.active, self.layer_2, self.active, self.layer_3)
+
+        self.layers = []
+        self.layers.append(self.input_layer)
+        self.layers.append(self.active)
+
+        for i in range(n_hidden):
+            self.layers.append(nn.Linear(n_input*n_output, n_input*n_output))
+            self.layers.append(self.active)
+
+        self.layers.append(self.output_layer)
+        self.model = nn.Sequential(*self.layers)
         self.loss = nn.MSELoss()
 
     def forward(self, x):
