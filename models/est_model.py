@@ -1,33 +1,44 @@
 import torch
 import torch.nn as nn
 import pytorch_lightning as pl
-from torcheval.metrics import R2Score
 from sklearn.metrics import r2_score
 
-class BasicBlock(pl.LightningModule):
-    def __init__(self, n_input: int, n_output: int):
+
+class ResidualBlock(pl.LightningModule):
+    def __init__(self, n_input: int, n_hidden: int):
         super().__init__()
-        self.n_neuron = n_input*n_output
-        self.basic_block = nn.Sequential(nn.Linear(self.n_neuron, self.n_neuron), nn.Linear(self.n_neuron, self.n_neuron))
-        self.shortcut_block = nn.Sequential()
-        self.relu = nn.ReLU()
+        self.layer_1 = nn.Linear(n_input, n_hidden)
+        self.layer_2 = nn.Linear(n_hidden, n_hidden)
+        self.layer_3 = nn.Linear(n_hidden, n_input)
+        self.active = nn.ReLU()
 
     def forward(self, x):
-        return self.relu(self.basic_block(x) + self.shortcut_block(x))
+        out = self.layer_1(x)
+        out = self.active(out)
+        out = self.layer_2(out)
+        out = self.active(out)
+        out = self.layer_3(out) + x
+        out = self.active(out)
+
+        return out
 
 
-class GroundPressureModel(pl.LightningModule):
+class ResidualRegression(pl.LightningModule):
     def __init__(self, n_input: int, n_layer: int, n_output: int):
         super().__init__()
-        block = BasicBlock(n_input, n_output)
+
+        self.layers = []
+        for i in range(n_layer):
+            self.layers.append(ResidualBlock(n_input, n_input*n_output*3))
+
+        self.output_layer = nn.Linear(n_input, n_output)
+        self.layers.append(self.output_layer)
+
+        self.model = nn.Sequential(*self.layers)
         self.loss = nn.MSELoss()
-        self.metric = R2Score()
-        self.layer = [block]*n_layer
-        self.model = nn.Sequential(nn.Linear(n_input, n_input*n_output), *self.layer, nn.Linear(n_input*n_output, n_output))
-        self.relu = nn.ReLU()
+        print(self.model)
 
     def forward(self, x):
-
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
@@ -35,7 +46,7 @@ class GroundPressureModel(pl.LightningModule):
         y_hat = self.forward(x)
         loss_val = self.loss(y_hat, y)
         self.log('train_loss', loss_val)
-        print(r2_score(y.cpu().detach().numpy(), y_hat.cpu().detach().numpy()))
+        # print(r2_score(y.cpu().detach().numpy(), y_hat.cpu().detach().numpy()))
         return loss_val
 
     '''
@@ -58,4 +69,29 @@ class GroundPressureModel(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=0.02)
 
+        return optimizer
+
+
+class DNNRegression(pl.LightningModule):
+    def __init__(self, n_input: int, n_hidden: int, n_output: int):
+        super().__init__()
+        self.layer_1 = nn.Linear(n_input, n_hidden)
+        self.layer_2 = nn.Linear(n_hidden, n_hidden)
+        self.layer_3 = nn.Linear(n_hidden, n_output)
+        self.active = nn.ReLU()
+        self.model = nn.Sequential(self.layer_1, self.active, self.layer_2, self.active, self.layer_3)
+        self.loss = nn.MSELoss()
+
+    def forward(self, x):
+        return self.model(x)
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self.forward(x)
+        loss_val = self.loss(y_hat, y)
+        self.log('train_loss', loss_val)
+        return loss_val
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=0.02)
         return optimizer
