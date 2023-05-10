@@ -8,10 +8,10 @@ with open('.' + os.sep + os.path.join('models', 'params_dnn_20220207-012403.json
 
 n_inputs = hyper_params['n_of_inputs']
 n_outputs = hyper_params['n_of_outputs']
-n_layers = hyper_params['n_of_layers']
+n_layers = hyper_params['n_of_hidden']
 
 
-model = DNNRegression(n_inputs, n_layers, n_outputs)
+model = ResidualRegression(n_inputs, n_layers, n_outputs)
 
 
 gpu = torch.device('cpu')

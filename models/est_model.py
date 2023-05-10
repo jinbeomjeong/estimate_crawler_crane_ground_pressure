@@ -4,41 +4,43 @@ import pytorch_lightning as pl
 from sklearn.metrics import r2_score
 
 
-class ResidualBlock(pl.LightningModule):
-    def __init__(self, n_input: int, n_hidden: int):
+class ResidualBlock(nn.Module):
+    def __init__(self, n_input: int, n_hidden: int, n_output: int):
         super().__init__()
-        self.layer_1 = nn.Linear(n_input, n_hidden)
-        self.layer_2 = nn.Linear(n_hidden, n_hidden)
-        self.layer_3 = nn.Linear(n_hidden, n_input)
         self.active = nn.ReLU()
+        self.layers = []
+
+        for i in range(n_hidden):
+            self.layers.append(nn.Linear(n_input, n_output))
+            self.layers.append(self.active)
+
+        self.layers = nn.Sequential(*self.layers)
 
     def forward(self, x):
-        out = self.layer_1(x)
-        out = self.active(out)
-        out = self.layer_2(out)
-        out = self.active(out)
-        out = self.layer_3(out) + x
-        out = self.active(out)
+        output = self.layers(x) + x
+        output = self.active(output)
 
-        return out
+        return output
 
 
 class ResidualRegression(pl.LightningModule):
-    def __init__(self, n_input: int, n_layer: int, n_output: int):
+    def __init__(self, n_input: int, n_hidden: int, n_output: int):
         super().__init__()
-
-        self.layers = []
-        for i in range(n_layer):
-            self.layers.append(ResidualBlock(n_input, n_input*n_output*3))
-
-        self.output_layer = nn.Linear(n_input, n_output)
-        self.layers.append(self.output_layer)
-
-        self.model = nn.Sequential(*self.layers)
+        self.input_layer = nn.Sequential(nn.Linear(n_input, n_input*n_output, bias=False))
+        self.output_layer = nn.Sequential(nn.Linear(n_input*n_output, n_output, bias=False))
+        self.res_block_1 = ResidualBlock(n_input*n_output, n_hidden, n_input*n_output)
+        self.res_block_2 = ResidualBlock(n_input*n_output, n_hidden, n_input*n_output)
+        self.res_block_3 = ResidualBlock(n_input*n_output, n_hidden, n_input*n_output)
         self.loss = nn.MSELoss()
 
     def forward(self, x):
-        return self.model(x)
+        output = self.input_layer(x)
+        output = self.res_block_1(output)
+        output = self.res_block_2(output)
+        output = self.res_block_3(output)
+        output = self.output_layer(output)
+
+        return output
 
     def training_step(self, batch, batch_idx):
         x, y = batch
