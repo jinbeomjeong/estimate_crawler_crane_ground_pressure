@@ -31,6 +31,9 @@ class ResidualRegression(pl.LightningModule):
         self.res_block_1 = ResidualBlock(n_input*n_output, n_hidden, n_input*n_output)
         self.res_block_2 = ResidualBlock(n_input*n_output, n_hidden, n_input*n_output)
         self.res_block_3 = ResidualBlock(n_input*n_output, n_hidden, n_input*n_output)
+        self.res_block_4 = ResidualBlock(n_input*n_output, n_hidden, n_input*n_output)
+        self.res_block_5 = ResidualBlock(n_input*n_output, n_hidden, n_input*n_output)
+
         self.loss = nn.MSELoss()
 
     def forward(self, x):
@@ -38,6 +41,8 @@ class ResidualRegression(pl.LightningModule):
         output = self.res_block_1(output)
         output = self.res_block_2(output)
         output = self.res_block_3(output)
+        output = self.res_block_4(output)
+        output = self.res_block_5(output)
         output = self.output_layer(output)
 
         return output
