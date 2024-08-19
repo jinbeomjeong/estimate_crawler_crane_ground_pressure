@@ -50,7 +50,7 @@ class TCPClient:
 
     def send_msg(self, message):
         self.__client_socket.send(len(message).to_bytes(4, byteorder='little'))
-        self.__client_socket.send(message.encode('utf-8'))
+        self.__client_socket.send(message)
 
     def receive_msg(self):
         receive_msg_len = int.from_bytes(self.__client_socket.recv(4), byteorder='little')
