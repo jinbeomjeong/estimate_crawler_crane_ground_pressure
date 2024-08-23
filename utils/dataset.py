@@ -70,13 +70,23 @@ class Dataset:
                                     'Actual_Load_Left_4(N)', 'Actual_Load_Left_5(N)', 'Actual_Load_Right_1(N)',
                                     'Actual_Load_Right_2(N)', 'Actual_Load_Right_3(N)', 'Actual_Load_Right_4(N)',
                                     'Actual_Load_Right_5(N)']
+
+        self.__model_feature_names = ['f10', 'f11', 'f12']
+        self.__model_target_names = ['f20', 'f21', 'f22', 'f23', 'f24', 'f25', 'f26', 'f27', 'f28', 'f29']
+
         self.__train_dataset = pd.DataFrame()
         self.__val_dataset = pd.DataFrame()
         self.__raw_dataset = self.load_dataset(file_path_list)
         self.__filtered_dataset = self.filtered_dataset(self.__raw_dataset)
 
-        len_data = self.__filtered_dataset.shape[0]
-        self.__n_of_interval = int(len_data / (len_data * 0.2))
+        self.__len_data = self.__filtered_dataset.shape[0]
+        self.__n_of_interval = int(self.__len_data / (self.__len_data * 0.2))
+
+        self.__train_dataset = self.__filtered_dataset.copy()
+        self.__train_dataset = self.__train_dataset.drop(self.__filtered_dataset.index[::self.__n_of_interval])
+
+        self.__val_dataset = self.__filtered_dataset.copy()
+        self.__val_dataset = self.__val_dataset[::self.__n_of_interval]
 
     @staticmethod
     def get_load_value(data_file_name: str) -> int:
@@ -136,14 +146,22 @@ class Dataset:
     def get_data_target_names(self) -> list:
         return self.__data_target_names
 
-    def get_train_dataset(self) -> pd.DataFrame():
-        train_dataset = self.__filtered_dataset.copy()
-        train_dataset = train_dataset.drop(self.__filtered_dataset.index[::self.__n_of_interval])
+    def get_model_feature_names(self) -> list:
+        return self.__model_feature_names
 
-        return pd.concat([train_dataset[self.__data_feature_names], train_dataset[self.__data_target_names]], axis=1)
+    def get_model_target_names(self) -> list:
+        return self.__model_target_names
 
-    def get_val_dataset(self) -> pd.DataFrame():
-        val_dataset = self.__filtered_dataset.copy()
-        val_dataset = val_dataset[::self.__n_of_interval]
+    def get_train_dataset(self) -> pd.DataFrame:
+        return pd.concat([self.__train_dataset[self.__data_feature_names], self.__train_dataset[self.__data_target_names]], axis=1)
 
-        return pd.concat([val_dataset[self.__data_feature_names], val_dataset[self.__data_target_names]], axis=1)
+    def get_val_dataset(self) -> pd.DataFrame:
+        return pd.concat([self.__val_dataset[self.__data_feature_names], self.__val_dataset[self.__data_target_names]], axis=1)
+
+    def get_train_dataset_for_model(self) -> pd.DataFrame:
+        return self.__train_dataset.rename(columns=dict(zip(self.__data_feature_names + self.__data_target_names,
+                                                            self.__model_feature_names + self.__model_target_names)))
+
+    def get_val_dataset_for_model(self) -> pd.DataFrame:
+        return self.__val_dataset.rename(columns=dict(zip(self.__data_feature_names + self.__data_target_names,
+                                                            self.__model_feature_names + self.__model_target_names)))
