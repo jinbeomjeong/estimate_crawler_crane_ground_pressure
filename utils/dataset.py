@@ -1,65 +1,65 @@
-import os, cv2, pytesseract, re
+import os, re#, cv2, pytesseract
 import numpy as np
 import pandas as pd
 from tqdm.auto import tqdm
 
-pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
-feature_names = ['swing_angle(deg)', 'boom_angle(deg)', 'weight(ton)']
-target_names = ['fl_pressure(kg/cm^2)', 'fr_pressure(kg/cm^2)', 'rl_pressure(kg/cm^2)', 'rr_pressure(kg/cm^2)', 'left_pressure_length(m)', 'right_pressure_length(m)']
-
-
-def img_to_dataset(img_path_list: list) -> np.array:
-    dataset_length = len(img_path_list)
-    target_status = np.zeros(shape=(dataset_length, len(target_names)), dtype=np.float64)
-    feature_status = np.zeros(shape=(dataset_length, len(feature_names)), dtype=np.float64)
-
-    for i, img_path in enumerate(tqdm(img_path_list, ncols=100, desc='data analyzing...')):
-        feature_parameter = img_path[img_path.rfind(os.sep) + 1:].rstrip('.jpg')
-
-        swing_angle = int(feature_parameter.split('swing-')[1].split('-boom')[0])
-        boom_angle = int(feature_parameter.split('boom-')[1].split('-weight')[0])
-        weight = int(feature_parameter.split('weight-')[1].split('-')[0])
-
-        feature_status[i, 0] = swing_angle
-        feature_status[i, 1] = boom_angle
-        feature_status[i, 2] = weight
-
-        img = cv2.imread(img_path)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-        fl_p_img = gray[628:646, 2220:2305]
-        fr_p_img = gray[628:646, 2462:2545]
-        rl_p_img = gray[814:830, 2220:2305]
-        rr_p_img = gray[814:830, 2462:2545]
-
-        pressure_imgz = [fl_p_img, fr_p_img, rl_p_img, rr_p_img]
-
-        for i, pressure_img in enumerate(pressure_imgz):
-            p_str = pytesseract.image_to_string(pressure_img)
-
-            try:
-                target_status[i, 0] = float(re.findall('\d+.\d+', p_str)[0])
-
-            except:
-                target_status[i, 0] = -1
-
-        left_length_img = np.transpose(np.flip(gray[662:808, 2260:2280], axis=0))
-        right_length_img = np.transpose(np.flip(gray[662:808, 2485:2505], axis=0))
-
-        length_imgz = [left_length_img, right_length_img]
-
-        for i, length_img in enumerate(length_imgz):
-            length_str = pytesseract.image_to_string(length_img)
-
-            try:
-                target_status[i, 1] = float(re.findall('\d+.\d+', length_str)[0])
-
-                if 6.75 < target_status[i, 1]:
-                    target_status[i, 1] = target_status[i, 1] / 100
-            except:
-                target_status[i, 1] = -1
-
-    return pd.DataFrame(np.hstack((feature_status, target_status)), columns=feature_names+target_names)
+# pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
+# feature_names = ['swing_angle(deg)', 'boom_angle(deg)', 'weight(ton)']
+# target_names = ['fl_pressure(kg/cm^2)', 'fr_pressure(kg/cm^2)', 'rl_pressure(kg/cm^2)', 'rr_pressure(kg/cm^2)', 'left_pressure_length(m)', 'right_pressure_length(m)']
+#
+#
+# def img_to_dataset(img_path_list: list) -> np.array:
+#     dataset_length = len(img_path_list)
+#     target_status = np.zeros(shape=(dataset_length, len(target_names)), dtype=np.float64)
+#     feature_status = np.zeros(shape=(dataset_length, len(feature_names)), dtype=np.float64)
+#
+#     for i, img_path in enumerate(tqdm(img_path_list, ncols=100, desc='data analyzing...')):
+#         feature_parameter = img_path[img_path.rfind(os.sep) + 1:].rstrip('.jpg')
+#
+#         swing_angle = int(feature_parameter.split('swing-')[1].split('-boom')[0])
+#         boom_angle = int(feature_parameter.split('boom-')[1].split('-weight')[0])
+#         weight = int(feature_parameter.split('weight-')[1].split('-')[0])
+#
+#         feature_status[i, 0] = swing_angle
+#         feature_status[i, 1] = boom_angle
+#         feature_status[i, 2] = weight
+#
+#         img = cv2.imread(img_path)
+#         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+#
+#         fl_p_img = gray[628:646, 2220:2305]
+#         fr_p_img = gray[628:646, 2462:2545]
+#         rl_p_img = gray[814:830, 2220:2305]
+#         rr_p_img = gray[814:830, 2462:2545]
+#
+#         pressure_imgz = [fl_p_img, fr_p_img, rl_p_img, rr_p_img]
+#
+#         for i, pressure_img in enumerate(pressure_imgz):
+#             p_str = pytesseract.image_to_string(pressure_img)
+#
+#             try:
+#                 target_status[i, 0] = float(re.findall('\d+.\d+', p_str)[0])
+#
+#             except:
+#                 target_status[i, 0] = -1
+#
+#         left_length_img = np.transpose(np.flip(gray[662:808, 2260:2280], axis=0))
+#         right_length_img = np.transpose(np.flip(gray[662:808, 2485:2505], axis=0))
+#
+#         length_imgz = [left_length_img, right_length_img]
+#
+#         for i, length_img in enumerate(length_imgz):
+#             length_str = pytesseract.image_to_string(length_img)
+#
+#             try:
+#                 target_status[i, 1] = float(re.findall('\d+.\d+', length_str)[0])
+#
+#                 if 6.75 < target_status[i, 1]:
+#                     target_status[i, 1] = target_status[i, 1] / 100
+#             except:
+#                 target_status[i, 1] = -1
+#
+#     return pd.DataFrame(np.hstack((feature_status, target_status)), columns=feature_names+target_names)
 
 
 class Dataset:
@@ -81,12 +81,6 @@ class Dataset:
 
         self.__len_data = self.__filtered_dataset.shape[0]
         self.__n_of_interval = int(self.__len_data / (self.__len_data * 0.2))
-
-        self.__train_dataset = self.__filtered_dataset.copy()
-        self.__train_dataset = self.__train_dataset.drop(self.__filtered_dataset.index[::self.__n_of_interval])
-
-        self.__val_dataset = self.__filtered_dataset.copy()
-        self.__val_dataset = self.__val_dataset[::self.__n_of_interval]
 
     @staticmethod
     def get_load_value(data_file_name: str) -> int:
@@ -153,15 +147,27 @@ class Dataset:
         return self.__model_target_names
 
     def get_train_dataset(self) -> pd.DataFrame:
-        return pd.concat([self.__train_dataset[self.__data_feature_names], self.__train_dataset[self.__data_target_names]], axis=1)
+        train_dataset = self.__filtered_dataset.copy()
+        train_dataset = train_dataset.drop(train_dataset.index[::self.__n_of_interval])
+        train_dataset = pd.concat([train_dataset[self.__data_feature_names], train_dataset[self.__data_target_names]], axis=1)
+
+        return train_dataset.reset_index(drop=True)
 
     def get_val_dataset(self) -> pd.DataFrame:
-        return pd.concat([self.__val_dataset[self.__data_feature_names], self.__val_dataset[self.__data_target_names]], axis=1)
+        val_dataset = self.__filtered_dataset.copy()
+        val_dataset = val_dataset[::self.__n_of_interval]
+        val_dataset = pd.concat([val_dataset[self.__data_feature_names], val_dataset[self.__data_target_names]], axis=1)
+
+        return val_dataset.reset_index(drop=True)
 
     def get_train_dataset_for_model(self) -> pd.DataFrame:
-        return self.__train_dataset.rename(columns=dict(zip(self.__data_feature_names + self.__data_target_names,
-                                                            self.__model_feature_names + self.__model_target_names)))
+        train_dataset = self.get_train_dataset()
+
+        return train_dataset.rename(columns=dict(zip(self.__data_feature_names + self.__data_target_names,
+                                                     self.__model_feature_names + self.__model_target_names)))
 
     def get_val_dataset_for_model(self) -> pd.DataFrame:
-        return self.__val_dataset.rename(columns=dict(zip(self.__data_feature_names + self.__data_target_names,
-                                                            self.__model_feature_names + self.__model_target_names)))
+        val_dataset = self.get_val_dataset()
+
+        return val_dataset.rename(columns=dict(zip(self.__data_feature_names + self.__data_target_names,
+                                                   self.__model_feature_names + self.__model_target_names)))
