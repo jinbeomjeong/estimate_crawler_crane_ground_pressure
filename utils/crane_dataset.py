@@ -62,7 +62,7 @@ from tqdm.auto import tqdm
 #     return pd.DataFrame(np.hstack((feature_status, target_status)), columns=feature_names+target_names)
 
 
-class Dataset:
+class CraneDataset:
     def __init__(self, file_path_list: list):
         self.__data_file_name_list = file_path_list
         self.__data_feature_names = ['Boom_Angle(deg)', 'Swing_Angle(deg)', 'Load(Ton)']
