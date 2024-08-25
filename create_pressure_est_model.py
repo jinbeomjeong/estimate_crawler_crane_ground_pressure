@@ -18,10 +18,9 @@ if __name__ == '__main__':
     data_file_name_list = os.listdir(data_root_path)
 
     data = PressureDataModule(data_path_list=data_file_name_list, seq_len=seq_len, pred_distance=pred_distance,
-                              batch_size=200, n_of_worker=8)
+                              batch_size=500, n_of_worker=8)
 
-    print(data)
     model = PressureModel(hidden_size=1024, num_layers=1, learning_rate=0.001)
 
-    trainer = pl.Trainer(accelerator='cpu', devices='auto', max_epochs=5, enable_progress_bar=True, logger=csv_logger)
+    trainer = pl.Trainer(accelerator='gpu', devices='auto', max_epochs=30, enable_progress_bar=True, logger=csv_logger)
     trainer.fit(model=model, datamodule=data)

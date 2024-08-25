@@ -25,11 +25,16 @@ class PressureDataModule(pl.LightningDataModule):
         super().__init__()
 
         self.__crane_dataset_inst = CraneDataset(data_path_list)
-        self.__train_data = self.__crane_dataset_inst.get_train_dataset()[self.__crane_dataset_inst.get_data_target_names()[0]]
+        self.__train_data = self.__crane_dataset_inst.get_train_dataset()[self.__crane_dataset_inst.get_data_target_names()]
         self.__train_data = self.__train_data.to_numpy()
+        self.__train_data = self.__train_data.T.flatten()
+        self.__train_data = (500000-self.__train_data)/500000
 
-        self.__val_data = self.__crane_dataset_inst.get_val_dataset()[self.__crane_dataset_inst.get_data_target_names()[0]]
+
+        self.__val_data = self.__crane_dataset_inst.get_val_dataset()[self.__crane_dataset_inst.get_data_target_names()]
         self.__val_data = self.__val_data.to_numpy()
+        self.__val_data = self.__val_data.T.flatten()
+        self.__val_data = (500000-self.__val_data)/500000
 
         self.__seq_len = seq_len
         self.__pred_distance = pred_distance

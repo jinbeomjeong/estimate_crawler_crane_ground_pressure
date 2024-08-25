@@ -20,7 +20,7 @@ class PressureModel(pl.LightningModule):
         out, _ = self.__model(input_data)
         out = self.fc(out[:, -1])
 
-        return out.squeeze()
+        return out.squeeze() * 500000
 
     def training_step(self, batch, batch_idx):
         data, label = batch
