@@ -37,21 +37,16 @@ BU_:
 
 
 BO_ 1009 load_cell_2: 8 Vector__XXX
- SG_ in_sig : 48|8@1+ (1,0) [0|255] "" Vector__XXX
- SG_ id_3F1_checksum : 56|8@1+ (1,0) [0|255] "" Vector__XXX
- SG_ AD_4_low : 16|7@1+ (1,0) [0|127] "" Vector__XXX
- SG_ AD_4_high : 24|7@1+ (1,0) [0|127] "" Vector__XXX
- SG_ AD_3_low : 0|7@1+ (1,0) [0|127] "" Vector__XXX
- SG_ AD_3_high : 8|7@1+ (1,0) [0|127] "" Vector__XXX
+ SG_ LC_4 : 48|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ LC_3 : 32|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ LC_2 : 16|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ LC_1 : 0|16@1+ (1,0) [0|65535] "" Vector__XXX
 
 BO_ 1008 load_cell_1: 8 Vector__XXX
- SG_ id_3F0_checksum : 56|8@1+ (1,0) [0|255] "" Vector__XXX
- SG_ AD_2_low : 32|7@1+ (1,0) [0|127] "" Vector__XXX
- SG_ AD_2_high : 40|7@1+ (1,0) [0|127] "" Vector__XXX
- SG_ AD_1_low : 16|7@1+ (1,0) [0|127] "" Vector__XXX
- SG_ AD_1_high : 24|7@1+ (1,0) [0|127] "" Vector__XXX
- SG_ AD_0_low : 0|7@1+ (1,0) [0|127] "" Vector__XXX
- SG_ AD_0_high : 8|7@1+ (1,0) [0|127] "" Vector__XXX
+ SG_ AD_3 : 48|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ AD_2 : 32|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ AD_1 : 16|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ AD_0 : 0|16@1+ (1,0) [0|65535] "" Vector__XXX
 
 
 

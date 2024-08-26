@@ -1,4 +1,4 @@
-import pickle, torch
+import torch
 import numpy as np
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader, Dataset
@@ -28,13 +28,15 @@ class PressureDataModule(pl.LightningDataModule):
         self.__train_data = self.__crane_dataset_inst.get_train_dataset()[self.__crane_dataset_inst.get_data_target_names()]
         self.__train_data = self.__train_data.to_numpy()
         self.__train_data = self.__train_data.T.flatten()
-        self.__train_data = (500000-self.__train_data)/500000
+        self.__train_data = self.__train_data[::10]
+        #self.__train_data = (500000-self.__train_data)/500000
 
 
         self.__val_data = self.__crane_dataset_inst.get_val_dataset()[self.__crane_dataset_inst.get_data_target_names()]
         self.__val_data = self.__val_data.to_numpy()
         self.__val_data = self.__val_data.T.flatten()
-        self.__val_data = (500000-self.__val_data)/500000
+        self.__val_data = self.__val_data[::10]
+        #self.__val_data = (500000-self.__val_data)/500000
 
         self.__seq_len = seq_len
         self.__pred_distance = pred_distance
@@ -61,5 +63,5 @@ class PressureDataModule(pl.LightningDataModule):
                           persistent_workers=True)
 
     def test_dataloader(self):
-        return DataLoader(dataset=self.__test_dataset, batch_size=self.__batch_size, shuffle=False, num_workers=self.__n_of_worker,
+        return DataLoader(dataset=self.__val_dataset, batch_size=self.__batch_size, shuffle=False, num_workers=self.__n_of_worker,
                           persistent_workers=True)
