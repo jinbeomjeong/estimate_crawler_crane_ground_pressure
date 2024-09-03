@@ -74,13 +74,9 @@ class CraneDataset:
         self.__model_feature_names = ['f10', 'f11', 'f12']
         self.__model_target_names = ['f20', 'f21', 'f22', 'f23', 'f24', 'f25', 'f26', 'f27', 'f28', 'f29']
 
-        self.__train_dataset = pd.DataFrame()
-        self.__val_dataset = pd.DataFrame()
         self.__raw_dataset = self.load_dataset(file_path_list)
         self.__filtered_dataset = self.filtered_dataset(self.__raw_dataset)
 
-        self.__len_data = self.__filtered_dataset.shape[0]
-        self.__n_of_interval = int(self.__len_data / (self.__len_data * 0.2))
 
     @staticmethod
     def get_load_value(data_file_name: str) -> int:
@@ -116,7 +112,7 @@ class CraneDataset:
         data_header = ['Time(sec)'] + self.__data_target_names + self.__data_feature_names
 
         for file_name in tqdm(data_file_names):
-            raw = pd.read_csv('data' + os.sep + file_name, encoding='cp949', header=None)
+            raw = pd.read_csv(file_name, encoding='cp949', header=None)
             raw.drop(0, inplace=True)
             raw.columns = data_header
             raw.reset_index(inplace=True, drop=True)
@@ -146,28 +142,8 @@ class CraneDataset:
     def get_model_target_names(self) -> list:
         return self.__model_target_names
 
-    def get_train_dataset(self) -> pd.DataFrame:
+    def get_dataset_for_model(self) -> pd.DataFrame:
         train_dataset = self.__filtered_dataset.copy()
-        train_dataset = train_dataset.drop(train_dataset.index[::self.__n_of_interval])
-        train_dataset = pd.concat([train_dataset[self.__data_feature_names], train_dataset[self.__data_target_names]], axis=1)
-
-        return train_dataset.reset_index(drop=True)
-
-    def get_val_dataset(self) -> pd.DataFrame:
-        val_dataset = self.__filtered_dataset.copy()
-        val_dataset = val_dataset[::self.__n_of_interval]
-        val_dataset = pd.concat([val_dataset[self.__data_feature_names], val_dataset[self.__data_target_names]], axis=1)
-
-        return val_dataset.reset_index(drop=True)
-
-    def get_train_dataset_for_model(self) -> pd.DataFrame:
-        train_dataset = self.get_train_dataset()
 
         return train_dataset.rename(columns=dict(zip(self.__data_feature_names + self.__data_target_names,
                                                      self.__model_feature_names + self.__model_target_names)))
-
-    def get_val_dataset_for_model(self) -> pd.DataFrame:
-        val_dataset = self.get_val_dataset()
-
-        return val_dataset.rename(columns=dict(zip(self.__data_feature_names + self.__data_target_names,
-                                                   self.__model_feature_names + self.__model_target_names)))
