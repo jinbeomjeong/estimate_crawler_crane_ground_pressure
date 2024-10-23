@@ -124,4 +124,9 @@ dmypy.json
 .pyre/
 
 # pycharm environment
-.idea
+.idea/
+
+# data, log and model files
+data/
+logs/
+models/
