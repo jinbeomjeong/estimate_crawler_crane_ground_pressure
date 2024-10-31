@@ -6,7 +6,7 @@ from utils.Msg_Parser import crane_state_msg_parse, crane_under_load_parse
 
 
 est_model = joblib.load('rf_model.joblib')
-udp_handle = UdpServer(address='localhost', port=6341)
+udp_handle = UdpServer(server_address='192.168.137.250', server_port=6340)
 
 while True:
     read_msg = udp_handle.receive_msg()

@@ -17,7 +17,7 @@ class UdpServer:
 
     def receive_msg(self):
         msg, self.client_address = self.server_socket.recvfrom(1024)
-        
+
         return msg
 
     def send_msg(self, message, client_address='localhost', port=6340):
