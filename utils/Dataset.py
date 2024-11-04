@@ -7,7 +7,7 @@ from sklearn.preprocessing import RobustScaler
 
 val_data_file_name_list = ['safe-boom-65-swing-180-load-80.csv', 'safe-boom-75-swing-180-load-110'
                            'unsafe-swing-0-load-70.csv', 'unsafe-swing-45-load-70.csv', 'unsafe-swing-90-load-70.csv',
-                           'unsafe-swing-135-load-70.csv', 'unsafe-swing-180-load-70.csv']
+                           'unsafe-swing-135-load-70.csv', 'unsafe-swing-185-load-70.csv']
 
 # pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
 # feature_names = ['swing_angle(deg)', 'boom_angle(deg)', 'weight(ton)']
