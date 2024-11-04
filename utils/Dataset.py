@@ -166,7 +166,7 @@ def create_lstm_dataset(data, seq_len=1, pred_distance=1, target_idx_pos=1):
     for i in range(data.shape[0] - pred_distance):
         if i + 1 >= seq_len:
             feature.append(data[i + 1 - seq_len:i + 1, :])
-            target.append(data[i + pred_distance, target_idx_pos])
+            target.append(data[i + pred_distance, target_idx_pos:target_idx_pos+10])
 
     return np.array(feature), np.array(target)
 

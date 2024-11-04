@@ -5,9 +5,7 @@ import numpy as np
 from utils.Dataset import CraneDataset, create_lstm_dataset
 from tqdm.auto import tqdm
 
-model_set = []
-for i in tqdm(range(10), desc='Loading best models'):
-    model_set.append(ort.InferenceSession(os.path.join('models', f'onnx_model_{i}_10.onnx')))
+model = ort.InferenceSession(os.path.join('models', f'onnx_model_10.onnx'))
 
 data_file_path_list = []
 data_file_name_list = os.listdir('data')
@@ -66,8 +64,7 @@ time_list = []
 for input_data in tqdm(val_feature):
     t0 = time.time()
 
-    for model in model_set:
-        pred = model.run(output_names=None, input_feed={'input': np.expand_dims(input_data, axis=0)})[0][0]
+    pred = model.run(output_names=None, input_feed={'input': np.expand_dims(input_data, axis=0)})[0][0]
     time_list.append(time.time() - t0)
 
 print('Average inference time per data sequence: {:.3f} seconds'.format(np.mean(time_list)))
