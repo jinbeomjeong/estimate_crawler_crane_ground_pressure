@@ -1,53 +1,59 @@
 import numpy as np
 
+
+margin_arr = np.zeros(4)
+load_ratio_arr = np.zeros(4)
+ref_angle_arr = np.linspace(start=0, stop=360, num=36001)
+
 left_load_idx_list = [0, 1, 2, 3, 4]
 right_load_idx_list = [5, 6, 7, 8, 9]
 
 front_load_idx_list = [0, 1, 5, 6]
 rear_load_idx_list = [3, 4, 8, 9]
 
-angle_list = [0, 45, 90, 135, 180, 225, 270, 315, 360]
-left_ref_load_list = [50, 70, 80, 70, 50, 30, 20, 30, 50]
-right_ref_load_list = [50, 30, 20, 30, 50, 70, 80, 70, 50]
-front_ref_load_list = [60, 90, 100, 90, 60, 90, 100, 90, 60]
+ref_left_load_ratio = 0.5*np.sin(np.deg2rad(ref_angle_arr))+0.5
+ref_left_load_ratio = (0.6*ref_left_load_ratio)+0.2
+
+ref_right_load_ratio = 1 - ref_left_load_ratio
+
+ref_front_load_ratio = 0.3 * np.sin(np.radians(ref_angle_arr) + np.pi / 2) + 0.5
+ref_rear_load_ratio = 1 - ref_front_load_ratio
 
 
-def calculate_side_view_load_margin(ref_load_ratio, actual_load_ratio):
-    if ref_load_ratio >= 50:
-        margin = ref_load_ratio - actual_load_ratio
-    else:
-        margin = actual_load_ratio - ref_load_ratio
+def calculate_load_margin(ground_load:np.array, swing_angle: float):
+    global margin_arr, load_ratio_arr
 
-    return 1-(margin / ref_load_ratio)
-
-
-def calculate_front_view_margin(ref_load_ratio, actual_load_ratio):
-    return 1-((ref_load_ratio - actual_load_ratio) / ref_load_ratio)
-
-
-def detect_roll_over(ground_load: np.array, swing_angle:float):
-    side_view_load_total = np.sum(ground_load)
+    load_total = np.sum(ground_load)
     left_load_total = np.sum(ground_load[left_load_idx_list])
     right_load_total = np.sum(ground_load[right_load_idx_list])
 
-    front_view_load_total = np.sum(ground_load[front_load_idx_list+rear_load_idx_list])
+    front_view_load_total = np.sum(ground_load[front_load_idx_list + rear_load_idx_list])
     front_load_total = np.sum(ground_load[front_load_idx_list])
     rear_load_total = np.sum(ground_load[rear_load_idx_list])
 
-    left_load_ratio = (left_load_total / side_view_load_total)*100
-    right_load_ratio = (right_load_total / side_view_load_total)*100
-    front_load_ratio = (front_load_total / front_view_load_total)*100
-    rear_load_ratio = (rear_load_total / front_view_load_total)*100
+    load_ratio_arr[0] = (left_load_total / load_total)
+    load_ratio_arr[1] = (right_load_total / load_total)
+    load_ratio_arr[2] = (front_load_total / front_view_load_total)
+    load_ratio_arr[3] = (rear_load_total / front_view_load_total)
 
-    ref_left_load_ratio = np.interp(swing_angle, angle_list, left_ref_load_list)
-    ref_right_load_ratio = np.interp(swing_angle, angle_list, right_ref_load_list)
-    ref_front_load_ratio = np.interp(swing_angle, angle_list, front_ref_load_list)
+    angle_idx = np.argmin(np.abs(ref_angle_arr - swing_angle))
 
-    left_load_margin = calculate_side_view_load_margin(ref_left_load_ratio, left_load_ratio)
-    right_load_margin = calculate_side_view_load_margin(ref_right_load_ratio, right_load_ratio)
-    front_load_margin = calculate_front_view_margin(ref_front_load_ratio, front_load_ratio)
-    rear_load_margin = calculate_front_view_margin(ref_front_load_ratio, rear_load_ratio)
+    if 0 <= swing_angle < 180:
+        margin_arr[0] = ref_left_load_ratio[angle_idx] - load_ratio_arr[0]
+        margin_arr[1] = load_ratio_arr[1] - ref_right_load_ratio[angle_idx]
 
-    return left_load_margin, right_load_margin, front_load_margin, rear_load_margin
+    if 180 <= swing_angle < 360:
+        margin_arr[0] = load_ratio_arr[0] - ref_left_load_ratio[angle_idx]
+        margin_arr[1] = ref_right_load_ratio[angle_idx] - load_ratio_arr[1]
 
+    if 0 <= swing_angle < 90 or 270 <= swing_angle < 360:
+        margin_arr[2] = ref_front_load_ratio[angle_idx] - load_ratio_arr[2]
+        margin_arr[3] = load_ratio_arr[3] - ref_rear_load_ratio[angle_idx]
 
+    if 90 <= swing_angle < 270:
+        margin_arr[2] = load_ratio_arr[2] - ref_front_load_ratio[angle_idx]
+        margin_arr[3] = ref_rear_load_ratio[angle_idx] - load_ratio_arr[3]
+
+    roll_over_det = np.any(margin_arr <= -0.05)
+
+    return margin_arr, roll_over_det
