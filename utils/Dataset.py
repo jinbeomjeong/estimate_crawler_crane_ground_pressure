@@ -68,6 +68,7 @@ class CraneDataset:
             ground_load_arr = raw[:, 1:11]
             angle_arr = raw[:, 11:13]
             angular_pos_arr = raw[:, 14:]
+            #safe_state = int(np.any(np.abs(raw[:, 14]) > 3) or np.any(np.abs(raw[:, 16]) > 3))
 
             load = self.get_load_value(file_name)
             load_arr = np.full(shape=(raw.shape[0], 1), fill_value=load, dtype=np.float32)
