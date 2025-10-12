@@ -39,7 +39,7 @@ class CraneDataset:
 
         return safe_state
 
-    def filtered_dataset(self, dataset: pd.DataFrame) -> pd.DataFrame():
+    def filtered_dataset(self, dataset: pd.DataFrame) -> pd.DataFrame:
         filtered_dataset = dataset.copy()
 
         filtered_dataset = filtered_dataset[filtered_dataset['Time(sec)'] > 2.0]
@@ -49,7 +49,7 @@ class CraneDataset:
 
         return filtered_dataset
 
-    def load_dataset(self, data_file_path_list: list) -> pd.DataFrame:
+    def load_dataset(self, data_file_path_list: list[str]) -> pd.DataFrame:
         data_header = ['Time(sec)'] + self.__extra_col_names + self.__data_feature_names + self.__data_target_names
         raw_dataset = []
 
