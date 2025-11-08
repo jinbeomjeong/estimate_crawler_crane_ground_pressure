@@ -76,6 +76,7 @@ class CraneDataset:
             safe_state = self.get_safe_state(file_name)
             safe_state_arr = np.full(shape=(raw.shape[0], 1), fill_value=safe_state, dtype=np.uint8)
             dataset_type_arr = np.full(shape=(raw.shape[0], 1), fill_value=dataset_type, dtype=np.uint8)
+            file_name_arr = np.full(shape=(raw.shape[0], 1), fill_value=file_name, dtype=np.str_)
 
             raw_data = np.concatenate([time_arr, file_idx_arr, safe_state_arr, dataset_type_arr, angle_arr,
                                        load_arr, angular_pos_arr, ground_load_arr], axis=1)
