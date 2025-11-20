@@ -1,9 +1,10 @@
 import tensorflow as tf
+
 from tensorflow import keras
-from utils.layer import InceptionBlock1D, FeatureWiseScalingLayer
-from utils.model import time_mixer_block
-from utils.metric import smape
-from utils.miscellaneous import count_divisions_by_two
+from src.models.layer import InceptionBlock1D, FeatureWiseScalingLayer
+from src.models.model import time_mixer_block
+from src.models.metric import smape
+from src.miscellaneous import count_divisions_by_two
 from tensorflow.keras.metrics import Precision, Recall, AUC
 
 

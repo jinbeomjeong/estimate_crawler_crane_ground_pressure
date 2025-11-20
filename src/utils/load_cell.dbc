@@ -36,11 +36,15 @@ BS_:
 BU_:
 
 
+BO_ 1010 load_cell_3: 8 Vector__XXX
+ SG_ LC_6 : 16|16@1+ (0.001,0) [0|65.535] "kg" Vector__XXX
+ SG_ LC_5 : 0|16@1+ (0.001,0) [0|65.535] "kg" Vector__XXX
+
 BO_ 1009 load_cell_2: 8 Vector__XXX
- SG_ LC_4 : 48|16@1+ (1,0) [0|65535] "" Vector__XXX
- SG_ LC_3 : 32|16@1+ (1,0) [0|65535] "" Vector__XXX
- SG_ LC_2 : 16|16@1+ (1,0) [0|65535] "" Vector__XXX
- SG_ LC_1 : 0|16@1+ (1,0) [0|65535] "" Vector__XXX
+ SG_ LC_4 : 48|16@1+ (0.001,0) [0|65.535] "kg" Vector__XXX
+ SG_ LC_3 : 32|16@1+ (0.001,0) [0|65.535] "kg" Vector__XXX
+ SG_ LC_2 : 16|16@1+ (0.001,0) [0|65.535] "kg" Vector__XXX
+ SG_ LC_1 : 0|16@1+ (0.001,0) [0|65.535] "kg" Vector__XXX
 
 BO_ 1008 load_cell_1: 8 Vector__XXX
  SG_ AD_3 : 48|16@1+ (1,0) [0|65535] "" Vector__XXX

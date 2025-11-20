@@ -1,8 +1,8 @@
 import tensorflow as tf
 from tensorflow import keras
-from utils.sub_layer import fft_for_period
-from utils.layer import InceptionBlock2D, DecompositionLayer
-from utils.sub_layer import count_divisions_by_two
+from src.models.sub_layer import fft_for_period
+from src.models.layer import InceptionBlock2D, DecompositionLayer
+from src.models.sub_layer import count_divisions_by_two
 
 
 class TimesNetBlock(keras.layers.Layer):

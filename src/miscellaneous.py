@@ -1,8 +1,5 @@
-import os
 import numpy as np
-import pandas as pd
 
-from utils.Dataset import CraneDataset
 from scipy.interpolate import CubicSpline
 from tqdm.auto import tqdm
 
@@ -64,24 +61,3 @@ def create_seq_dataset_multiple_input_single_output(data: np.array, seq_len=1, p
                 target.append(data[i + pred_distance, target_idx_pos:])
 
     return np.array(feature), np.array(target)  # data shape(n_samples, seq_len, n_features), seq len=[t-29, t-28, t-27,..., t0]
-
-
-def get_dataset(data_root_path: str) -> pd.DataFrame:
-    data_file_path_list = []
-    data_file_name_list = os.listdir(data_root_path)
-
-    for file_name in data_file_name_list:
-        data_file_path_list.append(os.path.join(data_root_path, file_name))
-
-    dataset_inst = CraneDataset(data_file_path_list)
-    raw_dataset = dataset_inst.get_dataset()
-    dataset = raw_dataset.copy()
-    dataset = dataset.iloc[0::10]
-    dataset.reset_index(drop=True, inplace=True)
-
-    target_name_list = dataset_inst.get_data_target_names()
-
-    for target_name in target_name_list:
-        dataset[target_name] = dataset[target_name] / 1000
-
-    return dataset

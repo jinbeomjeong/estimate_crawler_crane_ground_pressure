@@ -1,6 +1,7 @@
 import struct
 import numpy as np
 
+
 def crane_state_msg_parse(msg: bytearray) -> np.array:
     boom_angle = struct.unpack('f', msg[0:4])[0]
     swing_angle = struct.unpack('f', msg[4:8])[0]

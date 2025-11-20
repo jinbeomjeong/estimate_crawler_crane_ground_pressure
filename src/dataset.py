@@ -1,8 +1,8 @@
-import os, re#, cv2, pytesseract
+import os, re
 import numpy as np
 import pandas as pd
+
 from tqdm.auto import tqdm
-from sklearn.preprocessing import RobustScaler
 
 
 val_data_file_name_list = ['safe-boom-65-swing-180-load-80.csv', 'safe-boom-75-swing-180-load-110'
@@ -101,3 +101,24 @@ class CraneDataset:
 
     def get_model_target_names(self) -> list:
         return self.__model_target_names
+
+
+def get_dataset(data_root_path: str) -> pd.DataFrame:
+    data_file_path_list = []
+    data_file_name_list = os.listdir(data_root_path)
+
+    for file_name in data_file_name_list:
+        data_file_path_list.append(os.path.join(data_root_path, file_name))
+
+    dataset_inst = CraneDataset(data_file_path_list)
+    raw_dataset = dataset_inst.get_dataset()
+    dataset = raw_dataset.copy()
+    dataset = dataset.iloc[0::10]
+    dataset.reset_index(drop=True, inplace=True)
+
+    target_name_list = dataset_inst.get_data_target_names()
+
+    for target_name in target_name_list:
+        dataset[target_name] = dataset[target_name] / 1000
+
+    return dataset
