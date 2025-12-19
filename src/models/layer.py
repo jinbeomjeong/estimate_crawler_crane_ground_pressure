@@ -207,8 +207,8 @@ class FeatureWiseScalingLayer(keras.layers.Layer):
         super().build(input_shape)
 
     def call(self, inputs):
-        y = self.activation(self.scaling_vector)
-        y = inputs * y
+        y = inputs*self.scaling_vector
+        y = self.activation(y)
 
         return y
 

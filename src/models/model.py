@@ -78,8 +78,8 @@ class TimesNetBlock(keras.layers.Layer):
 
 
 def time_mixer_block(input_layer, pred_len=1, go_backward=False, dropout_rate=0.2):
-    input_raw = keras.backend.reverse(input_layer, axes=1) if go_backward else input_layer
-    input_raw = keras.backend.expand_dims(input_raw, axis=2)
+    input_raw = keras.ops.reverse(input_layer, axes=1) if go_backward else input_layer
+    input_raw = keras.ops.expand_dims(input_raw, axis=2)
 
     multi_scale_input_list = [input_raw]
 
@@ -94,12 +94,12 @@ def time_mixer_block(input_layer, pred_len=1, go_backward=False, dropout_rate=0.
     for multi_scale_input_layer in multi_scale_input_list:
         seasonal, trend = DecompositionLayer(kernel_size=3)(multi_scale_input_layer)
 
-        seasonal = keras.backend.squeeze(seasonal, axis=2)
+        seasonal = keras.ops.squeeze(seasonal, axis=2)
         seasonal_output = keras.layers.Dense(units=multi_scale_input_layer.shape[1], activation='linear')(seasonal)
         seasonal_output = keras.layers.Dropout(dropout_rate)(seasonal_output)
         seasonal_list.append(seasonal_output)
 
-        trend = keras.backend.squeeze(trend, axis=2)
+        trend = keras.ops.squeeze(trend, axis=2)
         trend_output = keras.layers.Dense(units=multi_scale_input_layer.shape[1], activation='linear')(trend)
         trend_output = keras.layers.Dropout(dropout_rate)(trend_output)
         trend_list.append(trend_output)
