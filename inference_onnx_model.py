@@ -1,31 +1,238 @@
-import time
+import os, logging, threading, time, struct, can, cantools, datetime, socket
 import onnxruntime as ort
 import numpy as np
+import pandas as pd
+import paho.mqtt.client as mqtt
+
+from pymodbus.server import StartSerialServer
+from pymodbus.datastore import ModbusSequentialDataBlock
+from pymodbus.datastore import ModbusDeviceContext, ModbusServerContext
+from src.msg_parser import LoadCellCANMsgParser
 
 
-model = ort.InferenceSession('models/model.onnx')
-print('ONNX model loaded successfully.')
-
-input_name = model.get_inputs()[0].name
-output_name = model.get_outputs()[0].name
-
-print(f'Input name: {input_name}')
-print(f'Output name: {output_name}')
-
-a = np.full(shape=(30, 1), fill_value=70, dtype=np.float32)
-b = np.full(shape=(30, 1), fill_value=0, dtype=np.float32)
-input_buf = np.expand_dims(np.concatenate([a, b, b],axis=1), axis=0)
+def modbus_com():
+    logger.info("modbus server started!")
+    StartSerialServer(context=context, port='/dev/com2', baudrate=115200,  bytesize=8, parity='N', stopbits=1)
 
 
-t0 = time.time()
+def can_com_1():
+    for can_msg in can_ch_1:
+        load_cell.get_values(packet=can_msg)
+
+
+def setup_can_interface():
+    os.system('sudo ip link set canb0 down')
+    os.system('sudo ip link set canb0 type can bitrate 250000')
+    os.system('sudo ip link set canb0 up')
+    time.sleep(1)
+    logger.info("CAN interface setup complete.")
+
+
+def run_udp_client():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.settimeout(2.0)
+
+    while True:
+        try:
+            msg = struct.pack('<6fB',
+                              load_cell_arr_fix[0].item(), load_cell_arr_fix[1].item(), load_cell_arr_fix[2].item(),
+                              load_cell_arr_fix[3].item(), load_cell_arr_fix[4].item(), load_cell_arr_fix[5].item(),
+                              detection)
+            sock.sendto(msg, (server_ip, server_port))
+
+            #sock.recvfrom(1024)
+            time.sleep(0.1)
+
+        except socket.timeout:
+            print("No Server Response. reconnecting...")
+            time.sleep(1)
+
+        except Exception as e:
+            print(f'udp system error: {e}')
+            time.sleep(1)
+
+
+logging.basicConfig()
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+pymodbus_log = logging.getLogger("pymodbus")
+pymodbus_log.setLevel(logging.CRITICAL)
+
+store = ModbusSequentialDataBlock(address=0, values=[0] * 100)
+slave_context = ModbusDeviceContext(hr=store)
+context = ModbusServerContext(devices={1: slave_context}, single=False)
+
+setup_can_interface()
+can_ch_1 = can.interface.Bus(interface='socketcan', channel='canb0', bitrate=250000)
+load_cell = LoadCellCANMsgParser('src/utils/load_cell.dbc')
+
+model = ort.InferenceSession('models/model_0.onnx')
+logger.info('onnx model loaded!')
+
+modbus_com_task = threading.Thread(target=modbus_com)
+modbus_com_task.daemon = True
+modbus_com_task.start()
+
+can_ch1_com_task = threading.Thread(target=can_com_1)
+can_ch1_com_task.daemon = True
+can_ch1_com_task.start()
+
+udp_com_task = threading.Thread(target=run_udp_client)
+udp_com_task.daemon = True
+udp_com_task.start()
+
+BROKER_ADDRESS = '192.168.0.2'
+client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+client.connect(host=BROKER_ADDRESS, port=1883)
+client.loop_start()
+
+logger.info('mqtt message publish client started!')
+
+logging_data = pd.DataFrame()
+data_name_list = ['time(sec)', 'boom_length(m)', 'boom_angle(deg)', 'load_weight(ton)', 'engine_speed(rpm)',
+                  'wind_speed(m/s)', 'swing_angle(deg)',
+                  'load_cell_left_1', 'load_cell_left_2', 'load_cell_left_3', 'load_cell_right_1', 'load_cell_right_2', 'load_cell_right_3',
+                  'detection']
+
+log_file_name = 'log_data/data' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '.csv'
+log_data_header = pd.DataFrame(columns=data_name_list)
+log_data_header.to_csv(log_file_name, mode='a', header=True)
+
+logger.info("program started!")
+
+seq_len = 30
+load_cell_arr_fix = np.zeros(shape=(6, ), dtype=np.float32)
+input_buf = np.zeros(shape=(1, seq_len, 5), dtype=np.float32)
+detection = 0
+
+server_ip = "192.168.137.18"
+server_port = 5005
+
+ref_working_radius_arr = np.arange(14, 66, 2)
+ref_load_arr = np.array([21.0, 20.9, 20.1, 19.3, 18.3, 16.3, 14.5, 12.9, 11.5, 10.2, 9.1, 8.2,
+                         7.3, 6.5, 5.9, 5.2, 4.7, 4.2, 3.7, 3.3, 2.9, 2.5, 2.2, 1.9, 1.6, 1.4])
+
+time_topic = "relative_time"
+boom_angle_topic = "boom_angle"
+load_weight_topic = "load_weight"
+swing_angle_topic = "swing_angle"
+engine_speed_topic = "engine_speed"
+detection_topic = "detection"
+
+left_load_1_topic = "left_load_1"
+left_load_2_topic = "left_load_2"
+left_load_3_topic = "left_load_3"
+
+right_load_1_topic = "right_load_1"
+right_load_2_topic = "right_load_2"
+right_load_3_topic = "right_load_3"
+
+front_load_ratio_topic = 'front_load_ratio'
+left_load_ratio_topic = 'left_load_ratio'
+
+
+t0 = time.perf_counter()
 
 while True:
-    ts = time.time()
+    prv_time = time.perf_counter()
+    relative_time = prv_time - t0
 
-    input_buf = np.roll(input_buf, shift=-1, axis=1)
-    #input_buf[:, -1, :] = input_data
+    register_values = store.getValues(address=0, count=50)
 
-    val_pred = np.squeeze(model.run(output_names=None, input_feed={'input': input_buf})).item()
-    print(f'{time.time()-t0:.2f}', f'{time.time() - ts:.2f}', val_pred)
+    packed_bytes = struct.pack('HH', register_values[3], register_values[2])
+    boom_length = struct.unpack('f', packed_bytes)[0]
+
+    packed_bytes = struct.pack('HH', register_values[5], register_values[4])
+    boom_angle = struct.unpack('f', packed_bytes)[0]
+
+    packed_bytes = struct.pack('HH', register_values[13], register_values[12])
+    load_weight = struct.unpack('f', packed_bytes)[0]
+
+    packed_bytes = struct.pack('HH', register_values[17], register_values[16])
+    engine_speed = struct.unpack('f', packed_bytes)[0]
+
+    packed_bytes = struct.pack('HH', register_values[35], register_values[34])
+    wind_speed = struct.unpack('f', packed_bytes)[0]
+
+    packed_bytes = struct.pack('HH', register_values[39], register_values[38])
+    swing_angle = struct.unpack('f', packed_bytes)[0]
+
+    load_cell_arr = load_cell.read_values()
+    load_cell_arr_fix[0] = load_cell_arr[2]
+    load_cell_arr_fix[1] = load_cell_arr[5]
+    load_cell_arr_fix[2] = load_cell_arr[1]
+    load_cell_arr_fix[3] = load_cell_arr[3]
+    load_cell_arr_fix[4] = load_cell_arr[4]
+    load_cell_arr_fix[5] = load_cell_arr[0]
+
+    mean_front_load = np.mean([load_cell_arr_fix[0], load_cell_arr_fix[3]])
+    mean_rear_load = np.mean([load_cell_arr_fix[2], load_cell_arr_fix[5]])
+    total_front_rear_load = mean_front_load.item() + mean_rear_load.item()
+    front_load_ratio = mean_front_load.item()/(total_front_rear_load)
+
+    mean_left_load = np.mean(load_cell_arr_fix[0:3])
+    mean_right_load = np.mean(load_cell_arr_fix[3:6])
+    total_left_right_load = mean_left_load.item()+mean_right_load.item()
+    left_load_ratio = mean_left_load.item()/(total_left_right_load)
+
+    measurement_working_radius = 75 * np.cos(np.deg2rad(boom_angle))
+    target_load = np.interp(measurement_working_radius, ref_working_radius_arr, ref_load_arr)
+
+    input_buf = np.roll(a=input_buf, shift=-1, axis=1)
+    input_buf[0, -1, :] = np.array([boom_angle, swing_angle, target_load, load_weight, engine_speed], dtype=np.float32)
+
+    if boom_angle > 50:
+        detection_raw = np.squeeze(model.run(output_names=None, input_feed={'input': input_buf})).item()
+        detection = detection_raw > 0.09
+        detection = int(detection)
+    else:
+        detection = 0
+        detection_raw = 0
+
+    logging_data = pd.DataFrame(data={data_name_list[0]: round(relative_time, 3),
+                                      data_name_list[1]: round(boom_length, 3),
+                                      data_name_list[2]: round(boom_angle, 3),
+                                      data_name_list[3]: round(load_weight, 3),
+                                      data_name_list[4]: round(engine_speed, 3),
+                                      data_name_list[5]: round(wind_speed, 3),
+                                      data_name_list[6]: round(swing_angle, 3),
+                                      data_name_list[7]: round(load_cell_arr_fix[0].item(), 3),
+                                      data_name_list[8]: round(load_cell_arr_fix[1].item(), 3),
+                                      data_name_list[9]: round(load_cell_arr_fix[2].item(), 3),
+                                      data_name_list[10]: round(load_cell_arr_fix[3].item(), 3),
+                                      data_name_list[11]: round(load_cell_arr_fix[4].item(), 3),
+                                      data_name_list[12]: round(load_cell_arr_fix[5].item(), 3),
+                                      data_name_list[13]: round(detection, 5)}, index=[0])
+    logging_data.to_csv(log_file_name, mode='a', header=False)
+
+    client.publish(topic=time_topic, payload=struct.pack('<f', relative_time))
+    client.publish(topic=boom_angle_topic, payload=struct.pack('<f', boom_angle))
+    client.publish(topic=load_weight_topic, payload=struct.pack('<f', load_weight))
+    client.publish(topic=swing_angle_topic, payload=struct.pack('<f', swing_angle))
+    client.publish(topic=engine_speed_topic, payload=struct.pack('<f', engine_speed))
+    client.publish(topic=left_load_1_topic, payload=struct.pack('<f', load_cell_arr_fix[0].item()))
+    client.publish(topic=left_load_2_topic, payload=struct.pack('<f', load_cell_arr_fix[1].item()))
+    client.publish(topic=left_load_3_topic, payload=struct.pack('<f', load_cell_arr_fix[2].item()))
+    client.publish(topic=right_load_1_topic, payload=struct.pack('<f', load_cell_arr_fix[3].item()))
+    client.publish(topic=right_load_2_topic, payload=struct.pack('<f', load_cell_arr_fix[4].item()))
+    client.publish(topic=right_load_3_topic, payload=struct.pack('<f', load_cell_arr_fix[5].item()))
+    client.publish(topic=detection_topic, payload=struct.pack('<f', detection))
+    client.publish(topic=front_load_ratio_topic, payload=struct.pack('<f', front_load_ratio))
+    client.publish(topic=left_load_ratio_topic, payload=struct.pack('<f', left_load_ratio))
+
+
+    period_time = time.perf_counter() - prv_time
+
+    if period_time >= 0.1:
+        delay_time = 0
+    else:
+        delay_time = 0.1 - period_time
+
+    time.sleep(delay_time)
+
+    logger.info(f'relative time: {relative_time:.2f}sec, period time: {period_time*1000:.2f}msec')
+    print(f'{boom_angle:.2f}', f'{swing_angle:.2f}', f'{load_weight:.2f}', load_cell_arr_fix, f'{detection_raw:.2f}')
+    print(f'{front_load_ratio:.3f}', f'{left_load_ratio:.3f}')
 
 

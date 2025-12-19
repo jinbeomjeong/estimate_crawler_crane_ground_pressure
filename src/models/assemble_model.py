@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 from tensorflow import keras
-from src.models.layer import InceptionBlock1D, FeatureWiseScalingLayer
+from src.models.layer import InceptionBlock1D, FeatureWiseScalingLayer, gelu_approximate
 from src.models.model import time_mixer_block
 from src.models.metric import smape
 from src.miscellaneous import count_divisions_by_two
@@ -85,18 +85,18 @@ with strategy.scope():
         input_layer = keras.layers.Input(shape=input_shape)
 
         #x = keras.layers.LayerNormalization()(input_layer)
-        x_res = keras.layers.Dense(units=d_dims, activation='gelu')(input_layer)
+        x_res = keras.layers.Dense(units=d_dims, activation=gelu_approximate)(input_layer)
 
         for i in range(count_divisions_by_two(input_shape[0])+1):
             dilation_rate = 2 ** i
-            x = keras.layers.Conv1D(filters=d_dims, kernel_size=3, activation='gelu', padding='causal',
+            x = keras.layers.Conv1D(filters=d_dims, kernel_size=3, activation=gelu_approximate, padding='causal',
                                     dilation_rate=dilation_rate)(x_res)
             x = keras.layers.Dropout(dropout_rate)(x)
-            x = keras.layers.Conv1D(filters=d_dims, kernel_size=3, activation='gelu', padding='causal',
+            x = keras.layers.Conv1D(filters=d_dims, kernel_size=3, activation=gelu_approximate, padding='causal',
                                     dilation_rate=dilation_rate)(x)
 
             x_res = keras.layers.BatchNormalization()(x + x_res)
-            x_res = keras.layers.Activation('gelu')(x_res)
+            x_res = keras.layers.Activation(gelu_approximate)(x_res)
 
         y = keras.layers.Flatten()(x_res)
         y = keras.layers.Dropout(dropout_rate)(y)

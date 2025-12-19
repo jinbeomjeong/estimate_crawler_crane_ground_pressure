@@ -1,7 +1,7 @@
 import tensorflow as tf
 from tensorflow import keras
 from src.models.sub_layer import fft_for_period
-from src.models.layer import InceptionBlock2D, DecompositionLayer
+from src.models.layer import InceptionBlock2D, DecompositionLayer, gelu_approximate
 from src.models.sub_layer import count_divisions_by_two
 
 
@@ -113,7 +113,7 @@ def time_mixer_block(input_layer, pred_len=1, go_backward=False, dropout_rate=0.
         output_1 = keras.layers.Dense(units=seasonal_list[i+1].shape[1], activation='linear')(output_1)
         output_1 = keras.layers.LayerNormalization()(output_1)
         output_1 = keras.layers.Dropout(dropout_rate)(output_1)
-        output_1 = keras.layers.Activation('gelu')(output_1) #gelu
+        output_1 = keras.layers.Activation(gelu_approximate)(output_1) #gelu
         output_1 = keras.layers.add([output_1, seasonal_list[i+1]])
         seasonal_mix_list.append(output_1)
 
@@ -125,7 +125,7 @@ def time_mixer_block(input_layer, pred_len=1, go_backward=False, dropout_rate=0.
         output_2 = keras.layers.Dense(units=trend_list[i+1].shape[1], activation='linear')(output_2)
         output_2 = keras.layers.LayerNormalization()(output_2)
         output_2 = keras.layers.Dropout(dropout_rate)(output_2)
-        output_2 = keras.layers.Activation('gelu')(output_2) #gelu
+        output_2 = keras.layers.Activation(gelu_approximate)(output_2) #gelu
         output_2 = keras.layers.add([output_2, trend_list[i+1]])
         trend_mix_list.append(output_2)
 
@@ -139,7 +139,7 @@ def time_mixer_block(input_layer, pred_len=1, go_backward=False, dropout_rate=0.
         mix_output = keras.layers.Dense(units=hidden_units, activation='linear')(mix_output)
         mix_output = keras.layers.LayerNormalization()(mix_output)
         mix_output = keras.layers.Dropout(dropout_rate)(mix_output)
-        mix_output = keras.layers.Dense(units=pred_len, activation='gelu')(mix_output) #gelu
+        mix_output = keras.layers.Dense(units=pred_len, activation=gelu_approximate)(mix_output) #gelu
         mix_output_list.append(mix_output)
 
     return keras.layers.add(mix_output_list)

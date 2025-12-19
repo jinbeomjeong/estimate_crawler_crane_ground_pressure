@@ -1,7 +1,7 @@
 import keras, tf2onnx, logging
 import tensorflow as tf
 
-from src.models.layer import DecompositionLayer, FeatureWiseScalingLayer
+from src.models.layer import DecompositionLayer, FeatureWiseScalingLayer, gelu_approximate
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -9,11 +9,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 pred_distance = 0
 model_path = f'../outputs/checkpoints/model_{pred_distance}.keras'
 model = keras.models.load_model(filepath=model_path, custom_objects={'DecompositionLayer': DecompositionLayer,
-                                                                     'FeatureWiseScalingLayer': FeatureWiseScalingLayer})
+                                                                     'FeatureWiseScalingLayer': FeatureWiseScalingLayer,
+                                                                     'gelu_approximate': gelu_approximate})
 logging.info(f'Model loaded from {model_path}')
 
 spec = (tf.TensorSpec(model.inputs[0].shape, tf.float32, name='input'),)
-onnx_model, _ = tf2onnx.convert.from_keras(model, input_signature=spec)
+onnx_model, _ = tf2onnx.convert.from_keras(model, input_signature=spec, opset=15)
 logging.info('converted ONNX model')
 
 with open(f'../outputs/checkpoints/model_{pred_distance}.onnx', "wb") as f:
