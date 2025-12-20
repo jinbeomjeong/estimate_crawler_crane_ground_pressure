@@ -1,5 +1,5 @@
+import keras
 import tensorflow as tf
-from tensorflow import keras
 from src.models.sub_layer import fft_for_period
 from src.models.layer import InceptionBlock2D, DecompositionLayer, gelu_approximate
 from src.models.sub_layer import count_divisions_by_two
