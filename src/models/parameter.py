@@ -1,0 +1,18 @@
+
+topic_dict = {'time_topic': 'relative_time',
+              'boom_angle_topic': 'boom_angle',
+              'load_weight_topic': 'load_weight',
+              'swing_angle_topic': 'swing_angle',
+              'engine_speed_topic': 'engine_speed',
+              'body_angle_x_topic': 'body_angle_x',
+              'body_angle_y_topic': 'body_angle_y',
+              'detection_topic': 'detection',
+              'left_load_1_topic': 'left_load_1',
+              'left_load_2_topic': 'left_load_2',
+              'left_load_3_topic': 'left_load_3',
+              'right_load_1_topic': 'right_load_1',
+              'right_load_2_topic': 'right_load_2',
+              'right_load_3_topic': 'right_load_3',
+              'front_load_ratio_topic': 'front_load_ratio',
+              'left_load_ratio_topic': 'left_load_ratio',
+              'roll_over_topic': 'roll_over_state'}
