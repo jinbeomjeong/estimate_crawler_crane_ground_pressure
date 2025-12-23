@@ -16,8 +16,13 @@ angle_data = {'x_axis': 0.0, 'y_axis': 0.0}
 seq_len = 50
 pred_distance = 0
 load_cell_arr_fix = np.zeros(shape=(6, ), dtype=np.float32)
-input_buf = np.zeros(shape=(1, seq_len, 3), dtype=np.float32)
+input_buf = np.zeros(shape=(1, seq_len, 6), dtype=np.float32)
+
+pred = 0.0
 detection = 0
+swing_angle = 90.0
+load_ratio = 0.0
+roll_over_state = 0
 
 server_ip = "192.168.137.18"
 server_port = 5005
@@ -74,7 +79,7 @@ logging.basicConfig()
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-model = ort.InferenceSession('outputs/checkpoints/model_seq_50_pred_0.onnx')
+model = ort.InferenceSession('outputs/checkpoints/model_seq_50_pred_0_15m.onnx')
 logger.info('onnx model loaded!')
 
 pymodbus_log = logging.getLogger("pymodbus")
@@ -100,28 +105,28 @@ can_ch1_com_task.start()
 logger.info('can channel 1 communication started!')
 
 network = canopen.Network()
-network.connect(bustype='socketcan', channel='canb1', bitrate=250000) # 테스트용
+network.connect(bustype='socketcan', channel='canb1', bitrate=250000)
 node = network.add_node(10)
-network.subscribe(can_id=0x18A, callback=pdo_callback)
-node.nmt.state = 'OPERATIONAL'
+#network.subscribe(can_id=0x18A, callback=pdo_callback)
+#node.nmt.state = 'OPERATIONAL'
 logger.info('can channel 2 communication started!')
 
-udp_com_task = threading.Thread(target=run_udp_client)
-udp_com_task.daemon = True
-udp_com_task.start()
-logger.info('udp communication started!')
+# udp_com_task = threading.Thread(target=run_udp_client)
+# udp_com_task.daemon = True
+# udp_com_task.start()
+# logger.info('udp communication started!')
 
-BROKER_ADDRESS = '192.168.0.2'
-client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-client.connect(host=BROKER_ADDRESS, port=1883)
-client.loop_start()
-logger.info('mqtt message publish client started!')
+# BROKER_ADDRESS = '192.168.0.2'
+# client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+# client.connect(host=BROKER_ADDRESS, port=1883)
+# client.loop_start()
+# logger.info('mqtt message publish client started!')
 
 logging_data = pd.DataFrame()
 data_name_list = ['time(sec)', 'boom_length(m)', 'boom_angle(deg)', 'load_weight(ton)', 'engine_speed(rpm)',
                   'wind_speed(m/s)', 'swing_angle(deg)', 'body_angle_x(deg)', 'body_angle_y(deg)',
                   'load_cell_left_1', 'load_cell_left_2', 'load_cell_left_3', 'load_cell_right_1', 'load_cell_right_2', 'load_cell_right_3',
-                  'forward_load_ratio', 'detection']
+                  'load_ratio', 'roll_over_state', 'pred', 'detection']
 
 log_file_name = 'log_data/data' + datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + '.csv'
 log_data_header = pd.DataFrame(columns=data_name_list)
@@ -155,25 +160,64 @@ while True:
     packed_bytes = struct.pack('HH', register_values[39], register_values[38])
     swing_angle = struct.unpack('f', packed_bytes)[0]
 
-    load_cell_arr = load_cell.read_values()
-    load_cell_arr_fix[0] = load_cell_arr[2]
-    load_cell_arr_fix[1] = load_cell_arr[5]
-    load_cell_arr_fix[2] = load_cell_arr[1]
-    load_cell_arr_fix[3] = load_cell_arr[3]
-    load_cell_arr_fix[4] = load_cell_arr[4]
-    load_cell_arr_fix[5] = load_cell_arr[0]
+    data_bytes = node.sdo.upload(0x6010, 0)
+    raw_val_x = struct.unpack('<h', data_bytes)[0]
+    raw_val_x /= 100
 
-    load_ratio, roll_over_state = calc_roll_over_state(load_cell_arr=load_cell_arr_fix)
+    data_bytes = node.sdo.upload(0x6020, 0)
+    raw_val_y = struct.unpack('<h', data_bytes)[0]
+    raw_val_y /= 100
+
+    body_x_axis_angle = raw_val_x
+    body_y_axis_angle = raw_val_y
+
+    load_cell_arr = load_cell.read_values()
+    load_cell_arr_fix[0] = load_cell_arr[0]
+    load_cell_arr_fix[1] = load_cell_arr[4]
+    load_cell_arr_fix[2] = load_cell_arr[3]
+    load_cell_arr_fix[3] = load_cell_arr[1]
+    load_cell_arr_fix[4] = load_cell_arr[5]
+    load_cell_arr_fix[5] = load_cell_arr[2]
 
     input_buf = np.roll(a=input_buf, shift=-1, axis=1)
-    input_buf[0, -1, :] = np.array([boom_angle, load_weight, engine_speed], dtype=np.float32)
+    input_buf[0, -1, :] = np.array([boom_angle, swing_angle, load_weight, engine_speed,
+                                    body_x_axis_angle, body_y_axis_angle], dtype=np.float32)
 
-    if boom_angle > 50:
+    if boom_angle > 20:
         pred = np.squeeze(model.run(output_names=None, input_feed={'input': input_buf})).item()
-        detection = int(detection > 0.01)
+        detection = int(detection > 0.91)
     else:
         detection = 0
         pred = 0
+
+    if swing_angle == 0:
+        left_sum = load_cell_arr_fix[0] + load_cell_arr_fix[2]
+        left_1 = load_cell_arr_fix[0] / left_sum
+        left_2 = load_cell_arr_fix[2] / left_sum
+        left = left_1 - left_2
+
+        right_sum = load_cell_arr_fix[3] + load_cell_arr_fix[5]
+        right_1 = load_cell_arr_fix[3] / right_sum
+        right_2 = load_cell_arr_fix[5] / right_sum
+        right = right_1 - right_2
+
+        load_ratio = left * right
+        roll_over_state = (load_ratio < -0.65) * 1
+
+    elif swing_angle == 90:
+        left_sum = load_cell_arr_fix[3] + load_cell_arr_fix[0]
+        left_1 = load_cell_arr_fix[3] / left_sum
+        left_2 = load_cell_arr_fix[0] / left_sum
+        left = left_1 - left_2
+
+        right_sum = load_cell_arr_fix[5] + load_cell_arr_fix[2]
+        right_1 = load_cell_arr_fix[5] / right_sum
+        right_2 = load_cell_arr_fix[2] / right_sum
+        right = right_1 - right_2
+
+        load_ratio = left * right
+        roll_over_state = (load_ratio < 0.2) * 1
+
 
     logging_data = pd.DataFrame(data={data_name_list[0]: round(relative_time, 3),
                                       data_name_list[1]: round(boom_length, 3),
@@ -182,8 +226,8 @@ while True:
                                       data_name_list[4]: round(engine_speed, 3),
                                       data_name_list[5]: round(wind_speed, 3),
                                       data_name_list[6]: round(swing_angle, 3),
-                                      data_name_list[7]: round(angle_data['x_axis'], 3),
-                                      data_name_list[8]: round(angle_data['y_axis'], 3),
+                                      data_name_list[7]: round(body_x_axis_angle, 3),
+                                      data_name_list[8]: round(body_y_axis_angle, 3),
                                       data_name_list[9]: round(load_cell_arr_fix[0].item(), 3),
                                       data_name_list[10]: round(load_cell_arr_fix[1].item(), 3),
                                       data_name_list[11]: round(load_cell_arr_fix[2].item(), 3),
@@ -191,25 +235,27 @@ while True:
                                       data_name_list[13]: round(load_cell_arr_fix[4].item(), 3),
                                       data_name_list[14]: round(load_cell_arr_fix[5].item(), 3),
                                       data_name_list[15]: round(load_ratio, 5),
-                                      data_name_list[16]: round(pred,5)}, index=[0])
+                                      data_name_list[16]: roll_over_state,
+                                      data_name_list[17]: round(pred,5),
+                                      data_name_list[18]: detection}, index=[0])
     logging_data.to_csv(log_file_name, mode='a', header=False)
 
-    client.publish(topic=topic_dict['time_topic'], payload=struct.pack('<f', relative_time))
-    client.publish(topic=topic_dict['boom_angle_topic'], payload=struct.pack('<f', boom_angle))
-    client.publish(topic=topic_dict['load_weight_topic'], payload=struct.pack('<f', load_weight))
-    client.publish(topic=topic_dict['swing_angle_topic'], payload=struct.pack('<f', swing_angle))
-    client.publish(topic=topic_dict['engine_speed_topic'], payload=struct.pack('<f', engine_speed))
-    client.publish(topic=topic_dict['body_angle_x_topic'], payload=struct.pack('<f', angle_data['x_axis']))
-    client.publish(topic=topic_dict['body_angle_y_topic'], payload=struct.pack('<f', angle_data['y_axis']))
-    client.publish(topic=topic_dict['left_load_1_topic'], payload=struct.pack('<f', load_cell_arr_fix[0].item()))
-    client.publish(topic=topic_dict['left_load_2_topic'], payload=struct.pack('<f', load_cell_arr_fix[1].item()))
-    client.publish(topic=topic_dict['left_load_3_topic'], payload=struct.pack('<f', load_cell_arr_fix[2].item()))
-    client.publish(topic=topic_dict['right_load_1_topic'], payload=struct.pack('<f', load_cell_arr_fix[3].item()))
-    client.publish(topic=topic_dict['right_load_2_topic'], payload=struct.pack('<f', load_cell_arr_fix[4].item()))
-    client.publish(topic=topic_dict['right_load_3_topic'], payload=struct.pack('<f', load_cell_arr_fix[5].item()))
-    client.publish(topic=topic_dict['detection_topic'], payload=struct.pack('<f', detection))
-    client.publish(topic=topic_dict['front_load_ratio_topic'], payload=struct.pack('<f', load_ratio))
-    client.publish(topic=topic_dict['roll_over_topic'], payload=struct.pack('<f', roll_over_state))
+    # client.publish(topic=topic_dict['time_topic'], payload=struct.pack('<f', relative_time))
+    # client.publish(topic=topic_dict['boom_angle_topic'], payload=struct.pack('<f', boom_angle))
+    # client.publish(topic=topic_dict['load_weight_topic'], payload=struct.pack('<f', load_weight))
+    # client.publish(topic=topic_dict['swing_angle_topic'], payload=struct.pack('<f', swing_angle))
+    # client.publish(topic=topic_dict['engine_speed_topic'], payload=struct.pack('<f', engine_speed))
+    # client.publish(topic=topic_dict['body_angle_x_topic'], payload=struct.pack('<f', angle_data['x_axis']))
+    # client.publish(topic=topic_dict['body_angle_y_topic'], payload=struct.pack('<f', angle_data['y_axis']))
+    # client.publish(topic=topic_dict['left_load_1_topic'], payload=struct.pack('<f', load_cell_arr_fix[0].item()))
+    # client.publish(topic=topic_dict['left_load_2_topic'], payload=struct.pack('<f', load_cell_arr_fix[1].item()))
+    # client.publish(topic=topic_dict['left_load_3_topic'], payload=struct.pack('<f', load_cell_arr_fix[2].item()))
+    # client.publish(topic=topic_dict['right_load_1_topic'], payload=struct.pack('<f', load_cell_arr_fix[3].item()))
+    # client.publish(topic=topic_dict['right_load_2_topic'], payload=struct.pack('<f', load_cell_arr_fix[4].item()))
+    # client.publish(topic=topic_dict['right_load_3_topic'], payload=struct.pack('<f', load_cell_arr_fix[5].item()))
+    # client.publish(topic=topic_dict['detection_topic'], payload=struct.pack('<f', detection))
+    # client.publish(topic=topic_dict['front_load_ratio_topic'], payload=struct.pack('<f', load_ratio))
+    # client.publish(topic=topic_dict['roll_over_topic'], payload=struct.pack('<f', roll_over_state))
 
     period_time = time.perf_counter() - prv_time
 
@@ -221,5 +267,4 @@ while True:
     time.sleep(delay_time)
 
     logger.info(f'relative time: {relative_time:.2f}sec, period time: {period_time*1000:.2f}msec')
-    print(f'{boom_angle:.2f}', f'{swing_angle:.2f}', f'{load_weight:.2f}', load_cell_arr_fix, f'{pred:.2f}')
-    print(f'{load_ratio:.3f}')
+    print(f'{boom_angle:.2f}', f'{load_weight:.2f}', f'{body_x_axis_angle:.2f}', f'{body_y_axis_angle:.2f}', f'{load_cell_arr_fix}', f'{load_ratio}')
