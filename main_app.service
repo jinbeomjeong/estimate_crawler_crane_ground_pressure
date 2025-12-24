@@ -1,0 +1,12 @@
+[Unit]
+Description=roll_over_det_app
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/workspace/estimate_crawler_crane_ground_pressure
+ExecStart=/home/pi/workspace/estimate_crawler_crane_ground_pressure/start.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

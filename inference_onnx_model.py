@@ -1,15 +1,14 @@
-import os, logging, threading, time, struct, can, canopen, datetime, socket
+import logging, threading, time, struct, can, canopen, datetime, socket
 import onnxruntime as ort
 import numpy as np
 import pandas as pd
-import paho.mqtt.client as mqtt
 
 from src.models.parameter import topic_dict
-from src.models.sub import calc_roll_over_state
 from pymodbus.server import StartSerialServer
 from pymodbus.datastore import ModbusSequentialDataBlock
 from pymodbus.datastore import ModbusDeviceContext, ModbusServerContext
-from src.msg_parser import LoadCellCANMsgParser
+from src.msg_parser import LoadCellCANMsgParser, byte_list_parser
+from src.miscellaneous import setup_can_interface
 
 
 angle_data = {'x_axis': 0.0, 'y_axis': 0.0}
@@ -20,12 +19,11 @@ input_buf = np.zeros(shape=(1, seq_len, 6), dtype=np.float32)
 
 pred = 0.0
 detection = 0
-swing_angle = 90.0
+ref_swing_angle = 0.0
 load_ratio = 0.0
 roll_over_state = 0
+udp_data = np.zeros(shape=(26, ), dtype=np.float32)
 
-server_ip = "192.168.137.18"
-server_port = 5005
 
 def modbus_com():
     logger.info("modbus server started!")
@@ -35,35 +33,16 @@ def can_com_1():
     for can_msg in can_ch_1:
         load_cell.get_values(packet=can_msg)
 
-def pdo_callback(can_id, data, timestamp):
-    global angle_data
-
-    raw_x, raw_y = struct.unpack('<hh', data[:4])
-    angle_data['x_axis'] = raw_x / 100.0
-    angle_data['y_axis'] = raw_y / 100.0
-
-
-def setup_can_interface(channel='canb0', bitrate=250000):
-    os.system(f'sudo ip link set {channel} down')
-    os.system(f'sudo ip link set {channel} type can bitrate {bitrate}')
-    os.system(f'sudo ip link set {channel} up')
-    time.sleep(1)
-    logger.info("CAN interface setup complete.")
-
-
-def run_udp_client():
+def udp_sender():
+    server_ip = "192.168.10.100"
+    server_port = 5005
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(2.0)
 
     while True:
         try:
-            msg = struct.pack('<6fB',
-                              load_cell_arr_fix[0].item(), load_cell_arr_fix[1].item(), load_cell_arr_fix[2].item(),
-                              load_cell_arr_fix[3].item(), load_cell_arr_fix[4].item(), load_cell_arr_fix[5].item(),
-                              detection)
+            msg = struct.pack('<26f', *udp_data)
             sock.sendto(msg, (server_ip, server_port))
-
-            #sock.recvfrom(1024)
             time.sleep(0.1)
 
         except socket.timeout:
@@ -107,16 +86,14 @@ logger.info('can channel 1 communication started!')
 network = canopen.Network()
 network.connect(bustype='socketcan', channel='canb1', bitrate=250000)
 node = network.add_node(10)
-#network.subscribe(can_id=0x18A, callback=pdo_callback)
-#node.nmt.state = 'OPERATIONAL'
 logger.info('can channel 2 communication started!')
 
-# udp_com_task = threading.Thread(target=run_udp_client)
-# udp_com_task.daemon = True
-# udp_com_task.start()
-# logger.info('udp communication started!')
+udp_com_task = threading.Thread(target=udp_sender)
+udp_com_task.daemon = True
+udp_com_task.start()
+logger.info('udp communication started!')
 
-# BROKER_ADDRESS = '192.168.0.2'
+# BROKER_ADDRESS = '192.168.137.172'
 # client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 # client.connect(host=BROKER_ADDRESS, port=1883)
 # client.loop_start()
@@ -142,34 +119,70 @@ while True:
 
     register_values = store.getValues(address=0, count=50)
 
-    packed_bytes = struct.pack('HH', register_values[3], register_values[2])
-    boom_length = struct.unpack('f', packed_bytes)[0]
+    boom_length = byte_list_parser([register_values[3], register_values[2]])
+    udp_data[7] = boom_length
 
-    packed_bytes = struct.pack('HH', register_values[5], register_values[4])
-    boom_angle = struct.unpack('f', packed_bytes)[0]
+    boom_angle = byte_list_parser([register_values[5], register_values[4]])
+    udp_data[8] = boom_angle
 
-    packed_bytes = struct.pack('HH', register_values[13], register_values[12])
-    load_weight = struct.unpack('f', packed_bytes)[0]
+    specifications = byte_list_parser([register_values[7], register_values[6]])
+    udp_data[9] = specifications
 
-    packed_bytes = struct.pack('HH', register_values[17], register_values[16])
-    engine_speed = struct.unpack('f', packed_bytes)[0]
+    Radius_MAIN = byte_list_parser([register_values[9], register_values[8]])
+    udp_data[10] = Radius_MAIN
 
-    packed_bytes = struct.pack('HH', register_values[35], register_values[34])
-    wind_speed = struct.unpack('f', packed_bytes)[0]
+    Radius_AUX = byte_list_parser([register_values[11], register_values[10]])
+    udp_data[11] = Radius_AUX
 
-    packed_bytes = struct.pack('HH', register_values[39], register_values[38])
-    swing_angle = struct.unpack('f', packed_bytes)[0]
+    load_weight = byte_list_parser([register_values[13], register_values[12]])
+    udp_data[12] = load_weight
+
+    battery_voltage = byte_list_parser([register_values[15], register_values[14]])
+    udp_data[13] = battery_voltage
+
+    engine_speed = byte_list_parser([register_values[17], register_values[16]])
+    udp_data[14] = engine_speed
+
+    engine_temp = byte_list_parser([register_values[19], register_values[18]])
+    udp_data[15] = engine_temp
+
+    oil_pressure = byte_list_parser([register_values[21], register_values[20]])
+    udp_data[16] = oil_pressure
+
+    Working_oil_temp = byte_list_parser([register_values[23], register_values[22]])
+    udp_data[17] = Working_oil_temp
+
+    main_height = byte_list_parser([register_values[25], register_values[24]])
+    udp_data[18] = main_height
+
+    aux_height = byte_list_parser([register_values[27], register_values[26]])
+    udp_data[19] = aux_height
+
+    _rd_height = byte_list_parser([register_values[29], register_values[28]])
+    udp_data[20] = _rd_height
+
+    status_1 = byte_list_parser([register_values[31], register_values[30]])
+    udp_data[21] = status_1
+
+    status_2 = byte_list_parser([register_values[33], register_values[32]])
+    udp_data[22] = status_2
+
+    lower_angle = byte_list_parser([register_values[37], register_values[36]])
+    udp_data[23] = lower_angle
+
+    wind_speed = byte_list_parser([register_values[35], register_values[34]])
+    udp_data[24] = wind_speed
+
+    swing_angle = byte_list_parser([register_values[39], register_values[38]])
+    udp_data[25] = swing_angle
 
     data_bytes = node.sdo.upload(0x6010, 0)
     raw_val_x = struct.unpack('<h', data_bytes)[0]
-    raw_val_x /= 100
+    body_x_axis_angle = raw_val_x/100
 
     data_bytes = node.sdo.upload(0x6020, 0)
     raw_val_y = struct.unpack('<h', data_bytes)[0]
-    raw_val_y /= 100
-
-    body_x_axis_angle = raw_val_x
-    body_y_axis_angle = raw_val_y
+    body_y_axis_angle = raw_val_y/100
 
     load_cell_arr = load_cell.read_values()
     load_cell_arr_fix[0] = load_cell_arr[0]
@@ -178,46 +191,50 @@ while True:
     load_cell_arr_fix[3] = load_cell_arr[1]
     load_cell_arr_fix[4] = load_cell_arr[5]
     load_cell_arr_fix[5] = load_cell_arr[2]
+    
+    for i in range(len(load_cell_arr_fix)):
+        udp_data[i] = load_cell_arr_fix[i].item()
 
     input_buf = np.roll(a=input_buf, shift=-1, axis=1)
-    input_buf[0, -1, :] = np.array([boom_angle, swing_angle, load_weight, engine_speed,
+    input_buf[0, -1, :] = np.array([boom_angle, ref_swing_angle, load_weight, engine_speed,
                                     body_x_axis_angle, body_y_axis_angle], dtype=np.float32)
 
-    if boom_angle > 20:
+    if engine_speed > 300:
         pred = np.squeeze(model.run(output_names=None, input_feed={'input': input_buf})).item()
-        detection = int(detection > 0.91)
+        detection = (pred > 0.91)*1
     else:
         detection = 0
         pred = 0
 
-    if swing_angle == 0:
+    udp_data[6] = detection
+
+    if True:
         left_sum = load_cell_arr_fix[0] + load_cell_arr_fix[2]
-        left_1 = load_cell_arr_fix[0] / left_sum
-        left_2 = load_cell_arr_fix[2] / left_sum
+        left_1 = load_cell_arr_fix[0] / (left_sum+0.001)
+        left_2 = load_cell_arr_fix[2] / (left_sum+0.001)
         left = left_1 - left_2
 
         right_sum = load_cell_arr_fix[3] + load_cell_arr_fix[5]
-        right_1 = load_cell_arr_fix[3] / right_sum
-        right_2 = load_cell_arr_fix[5] / right_sum
+        right_1 = load_cell_arr_fix[3] / (right_sum+0.001)
+        right_2 = load_cell_arr_fix[5] / (right_sum+0.001)
         right = right_1 - right_2
 
         load_ratio = left * right
         roll_over_state = (load_ratio < -0.65) * 1
 
-    elif swing_angle == 90:
+    else:
         left_sum = load_cell_arr_fix[3] + load_cell_arr_fix[0]
-        left_1 = load_cell_arr_fix[3] / left_sum
-        left_2 = load_cell_arr_fix[0] / left_sum
+        left_1 = load_cell_arr_fix[3] / (left_sum+0.001)
+        left_2 = load_cell_arr_fix[0] / (left_sum+0.001)
         left = left_1 - left_2
 
         right_sum = load_cell_arr_fix[5] + load_cell_arr_fix[2]
-        right_1 = load_cell_arr_fix[5] / right_sum
-        right_2 = load_cell_arr_fix[2] / right_sum
+        right_1 = load_cell_arr_fix[5] / (right_sum+0.001)
+        right_2 = load_cell_arr_fix[2] / (right_sum+0.001)
         right = right_1 - right_2
 
         load_ratio = left * right
         roll_over_state = (load_ratio < 0.2) * 1
-
 
     logging_data = pd.DataFrame(data={data_name_list[0]: round(relative_time, 3),
                                       data_name_list[1]: round(boom_length, 3),
@@ -267,4 +284,5 @@ while True:
     time.sleep(delay_time)
 
     logger.info(f'relative time: {relative_time:.2f}sec, period time: {period_time*1000:.2f}msec')
-    print(f'{boom_angle:.2f}', f'{load_weight:.2f}', f'{body_x_axis_angle:.2f}', f'{body_y_axis_angle:.2f}', f'{load_cell_arr_fix}', f'{load_ratio}')
+    # print(f'{boom_angle:.2f}', f'{load_weight:.2f}', f'{body_x_axis_angle:.2f}', f'{body_y_axis_angle:.2f}',
+    #       f'{load_cell_arr_fix}', f'{load_ratio:.2f}', roll_over_state, f'{pred:.3f}', detection)

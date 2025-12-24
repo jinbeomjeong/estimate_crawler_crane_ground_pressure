@@ -1,3 +1,4 @@
+import os, time
 import numpy as np
 
 from scipy.interpolate import CubicSpline
@@ -61,3 +62,10 @@ def create_seq_dataset_multiple_input_single_output(data: np.array, seq_len=1, p
                 target.append(data[i + pred_distance, target_idx_pos:])
 
     return np.array(feature), np.array(target)  # data shape(n_samples, seq_len, n_features), seq len=[t-29, t-28, t-27,..., t0]
+
+
+def setup_can_interface(channel='canb0', bitrate=250000):
+    os.system(f'sudo ip link set {channel} down')
+    os.system(f'sudo ip link set {channel} type can bitrate {bitrate}')
+    os.system(f'sudo ip link set {channel} up')
+    time.sleep(1)

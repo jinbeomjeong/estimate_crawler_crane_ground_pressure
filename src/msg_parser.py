@@ -47,3 +47,9 @@ class LoadCellCANMsgParser:
 
     def read_values(self) -> np.ndarray:
         return self.__load_cell_arr
+
+
+def byte_list_parser(byte_list: list[int]) -> float:
+    packed_bytes = struct.pack('HH', byte_list[0], byte_list[1])
+
+    return struct.unpack('f', packed_bytes)[0]
