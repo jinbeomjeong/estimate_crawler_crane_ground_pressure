@@ -191,7 +191,7 @@ while True:
     load_cell_arr_fix[3] = load_cell_arr[1]
     load_cell_arr_fix[4] = load_cell_arr[5]
     load_cell_arr_fix[5] = load_cell_arr[2]
-    
+
     for i in range(len(load_cell_arr_fix)):
         udp_data[i] = load_cell_arr_fix[i].item()
 
