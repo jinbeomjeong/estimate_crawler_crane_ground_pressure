@@ -1,14 +1,13 @@
+import os
+os.environ["KERAS_BACKEND"] = "jax"
+
 import keras
-import tensorflow as tf
 
 from src.models.layer import InceptionBlock1D, FeatureWiseScalingLayer, gelu_approximate
 from src.models.model import time_mixer_block
-from src.models.metric import smape
+#from src.models.metric import smape
 from src.miscellaneous import count_divisions_by_two
-from keras.metrics import Precision, Recall, AUC
-
-
-strategy = tf.distribute.MirroredStrategy()
+from keras.metrics import Precision, Recall, AUC, F1Score
 
 
 def build_inception_model(input_shape=(1, 1), dropout_rate=0.2):
@@ -80,86 +79,77 @@ def build_inception_model(input_shape=(1, 1), dropout_rate=0.2):
     return model
 
 
-with strategy.scope():
-    def build_detection_model(input_shape, d_dims=64, dropout_rate=0.2, learning_rate=0.001):
-        input_layer = keras.layers.Input(shape=input_shape)
-
-        #x = keras.layers.LayerNormalization()(input_layer)
-        x_res = keras.layers.Dense(units=d_dims, activation=gelu_approximate)(input_layer)
-
-        for i in range(count_divisions_by_two(input_shape[0])+1):
-            dilation_rate = 2 ** i
-            x = keras.layers.Conv1D(filters=d_dims, kernel_size=3, activation=gelu_approximate, padding='causal',
-                                    dilation_rate=dilation_rate)(x_res)
-            x = keras.layers.Dropout(dropout_rate)(x)
-            x = keras.layers.Conv1D(filters=d_dims, kernel_size=3, activation=gelu_approximate, padding='causal',
-                                    dilation_rate=dilation_rate)(x)
-
-            x_res = keras.layers.BatchNormalization()(x + x_res)
-            x_res = keras.layers.Activation(gelu_approximate)(x_res)
-
-        y = keras.layers.Flatten()(x_res)
-        y = keras.layers.Dropout(dropout_rate)(y)
-
-        y = FeatureWiseScalingLayer()(y)
-        
-        y_res = keras.layers.Dense(units=input_shape[0], activation='linear')(y)
-        y_res = keras.layers.LayerNormalization()(y_res)
-
-        for j in range(3):
-            y = time_mixer_block(input_layer=y_res, pred_len=input_shape[0], dropout_rate=dropout_rate)
-            y_res = y + y_res
-
-        y = keras.layers.Dropout(dropout_rate)(y_res)
-        y = keras.layers.Dense(units=1, activation='sigmoid')(y)
-
-        model = keras.models.Model(inputs=input_layer, outputs=y)
-
-        optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
-
-        model.compile(optimizer=optimizer, loss='binary_crossentropy',
-                      metrics=['accuracy', Precision(), Recall(), AUC()])
-
-        return model
-
-# with strategy.scope():
-#     def build_predict_model(input_shape, d_dims=64, dropout_rate=0.2, learning_rate=0.001):
-#         input_layer = keras.layers.Input(shape=input_shape)
+# def build_detection_model(input_shape, d_dims=64, dropout_rate=0.2, learning_rate=0.001):
+#     input_layer = keras.layers.Input(shape=input_shape)
 #
-#         x = keras.layers.LayerNormalization()(input_layer)
-#         x_res = keras.layers.Dense(units=d_dims, activation='gelu')(x)
+#     x_res = keras.layers.Dense(units=d_dims, activation=gelu_approximate)(input_layer)
 #
-#         for i in range(count_divisions_by_two(input_shape[0])+1):
-#             dilation_rate = 2 ** i
-#             x = keras.layers.Conv1D(filters=d_dims, kernel_size=3, activation='gelu', padding='causal',
-#                                     dilation_rate=dilation_rate)(x_res)
-#             x = keras.layers.Dropout(dropout_rate)(x)
-#             x = keras.layers.Conv1D(filters=d_dims, kernel_size=3, activation='gelu', padding='causal',
-#                                     dilation_rate=dilation_rate)(x)
+#     for i in range(count_divisions_by_two(input_shape[0])+1):
+#         dilation_rate = 2 ** i
+#         x = keras.layers.Conv1D(filters=d_dims, kernel_size=3, activation=gelu_approximate, padding='causal',
+#                                 dilation_rate=dilation_rate)(x_res)
+#         x = keras.layers.Dropout(dropout_rate)(x)
+#         x = keras.layers.Conv1D(filters=d_dims, kernel_size=3, activation=gelu_approximate, padding='causal',
+#                                 dilation_rate=dilation_rate)(x)
 #
-#             x_res = keras.layers.BatchNormalization()(x + x_res)
-#             x_res = keras.layers.Activation('gelu')(x_res)
+#         x_res = keras.layers.BatchNormalization()(x + x_res)
+#         x_res = keras.layers.Activation(gelu_approximate)(x_res)
 #
-#         y = keras.layers.Flatten()(x_res)
-#         y = keras.layers.Dropout(dropout_rate)(y)
+#     y = keras.layers.Flatten()(x_res)
+#     y = keras.layers.Dropout(dropout_rate)(y)
 #
-#         y = FeatureWiseScalingLayer()(y)
-#         y_res = keras.layers.Dense(units=input_shape[0]*3, activation='linear')(y)
-#         y_res = keras.layers.LayerNormalization()(y_res)
+#     y = keras.layers.Dense(units=d_dims, activation='linear')(y)
+#     y = FeatureWiseScalingLayer()(y)
 #
-#         for j in range(3):
-#             y = time_mixer_block(input_layer=y_res, pred_len=input_shape[0]*3, dropout_rate=dropout_rate)
-#             y_res = y + y_res
+#     y = keras.layers.Dense(units=3, activation='softmax')(y)
 #
-#         y = keras.layers.LayerNormalization()(y_res)
-#         y = FeatureWiseScalingLayer()(y)
-#         y = keras.layers.Dense(units=1, activation='sigmoid')(y)
+#     model = keras.models.Model(inputs=input_layer, outputs=y)
 #
-#         model = keras.models.Model(inputs=input_layer, outputs=y)
+#     optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
 #
-#         optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
+#     model.compile(optimizer=optimizer, loss='categorical_crossentropy',
+#                   metrics=['accuracy', Precision(), Recall(), AUC()])
 #
-#         model.compile(optimizer=optimizer, loss='binary_crossentropy',
-#                       metrics=['accuracy', Precision(), Recall(), AUC()])
-#
-#         return model
+#     return model
+
+def build_predict_model(input_shape, d_dims=64, dropout_rate=0.2, learning_rate=0.001):
+    input_layer = keras.layers.Input(shape=input_shape)
+
+    x_res = keras.layers.Dense(units=d_dims, activation=gelu_approximate)(input_layer)
+
+    for i in range(count_divisions_by_two(input_shape[0])+1):
+        dilation_rate = 2 ** i
+        x = keras.layers.Conv1D(filters=d_dims, kernel_size=3, activation=gelu_approximate, padding='causal',
+                                dilation_rate=dilation_rate)(x_res)
+        x = keras.layers.Dropout(dropout_rate)(x)
+        x = keras.layers.Conv1D(filters=d_dims, kernel_size=3, activation=gelu_approximate, padding='causal',
+                                dilation_rate=dilation_rate)(x)
+        x = keras.layers.Dropout(dropout_rate)(x)
+        x_res = keras.layers.BatchNormalization(x+x_res)
+        x_res = keras.layers.Activation(gelu_approximate)(x_res)
+
+    y = keras.layers.Flatten()(x_res)
+    #y = keras.ops.mean(x_res, axis=1, keepdims=False)
+    #y = keras.layers.GlobalAvgPool1D(data_format='channels_last')(x_res)
+    #y_max = keras.layers.GlobalMaxPool1D(data_format='channel_last')(x_res)
+    #y = keras.layers.concatenate([y_agv, y_max], axis=1)
+    y = keras.layers.Dropout(dropout_rate)(y)
+
+    y = keras.layers.Dense(units=input_shape[0], activation='linear')(y)
+    y_res = FeatureWiseScalingLayer()(y)
+
+    for j in range(3):
+        y = time_mixer_block(input_layer=y_res, pred_len=input_shape[0], dropout_rate=dropout_rate)
+        y_res = y + y_res
+
+    y = FeatureWiseScalingLayer()(y_res)
+    y = keras.layers.Dense(units=1, activation='sigmoid')(y)
+
+    model = keras.models.Model(inputs=input_layer, outputs=y)
+
+    optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
+
+    model.compile(optimizer=optimizer, loss='binary_crossentropy',
+                  metrics=['accuracy', Precision(), Recall(), AUC()])
+
+    return model

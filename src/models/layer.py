@@ -1,51 +1,53 @@
+import os
+os.environ["KERAS_BACKEND"] = "jax"
+
 import keras
 import numpy as np
-import tensorflow as tf
 
 from src.models.sub_layer import conv_1d_1x1, conv_1d_1x3, conv_1d_1x5, conv_1d_1x7, max_pool_1d_to_1x1
 from src.models.sub_layer import conv_2d_1x1, conv_2d_1x3, conv_2d_1x5, max_pool_2d_to_1x1
 
 
 def gelu_approximate(x):
-    return tf.nn.gelu(x, approximate=True)
+    return keras.activations.gelu(x, approximate=True)
 
 
-class PositionalEncoding(keras.layers.Layer):
-    def __init__(self, position, d_model, **kwargs):
-        """
-        포지셔널 인코딩 레이어를 초기화합니다.
-
-        Args:
-            position (int): 시퀀스의 최대 길이 (최대 문장 길이)
-            d_model (int): 임베딩 벡터의 차원
-        """
-        super(PositionalEncoding, self).__init__(**kwargs) # **kwargs 전달
-        self.position = position
-        self.d_model = d_model
-        self.pos_encoding = self.positional_encoding(position, d_model)
-
-    def get_angles(self, position, i, d_model):
-        """
-        각도 계산을 위한 내부 함수
-        """
-        angles = 1 / np.power(10000, (2 * (i // 2)) / np.float32(d_model))
-        return position * angles
-
-    def positional_encoding(self, position, d_model):
-        """
-        포지셔널 인코딩 행렬을 생성합니다.
-        """
-        angle_rads = self.get_angles(np.arange(position)[:, np.newaxis],
-                                     np.arange(d_model)[np.newaxis, :],
-                                     d_model)
-
-        # 짝수 인덱스에는 사인 함수 적용
-        angle_rads[:, 0::2] = np.sin(angle_rads[:, 0::2])
-        # 홀수 인덱스에는 코사인 함수 적용
-        angle_rads[:, 1::2] = np.cos(angle_rads[:, 1::2])
-
-        pos_encoding = angle_rads[np.newaxis, ...]
-        return tf.cast(pos_encoding, dtype=tf.float32)
+# class PositionalEncoding(keras.layers.Layer):
+#     def __init__(self, position, d_model, **kwargs):
+#         """
+#         포지셔널 인코딩 레이어를 초기화합니다.
+#
+#         Args:
+#             position (int): 시퀀스의 최대 길이 (최대 문장 길이)
+#             d_model (int): 임베딩 벡터의 차원
+#         """
+#         super(PositionalEncoding, self).__init__(**kwargs) # **kwargs 전달
+#         self.position = position
+#         self.d_model = d_model
+#         self.pos_encoding = self.positional_encoding(position, d_model)
+#
+#     def get_angles(self, position, i, d_model):
+#         """
+#         각도 계산을 위한 내부 함수
+#         """
+#         angles = 1 / np.power(10000, (2 * (i // 2)) / np.float32(d_model))
+#         return position * angles
+#
+#     def positional_encoding(self, position, d_model):
+#         """
+#         포지셔널 인코딩 행렬을 생성합니다.
+#         """
+#         angle_rads = self.get_angles(np.arange(position)[:, np.newaxis],
+#                                      np.arange(d_model)[np.newaxis, :],
+#                                      d_model)
+#
+#         # 짝수 인덱스에는 사인 함수 적용
+#         angle_rads[:, 0::2] = np.sin(angle_rads[:, 0::2])
+#         # 홀수 인덱스에는 코사인 함수 적용
+#         angle_rads[:, 1::2] = np.cos(angle_rads[:, 1::2])
+#
+#         pos_encoding = angle_rads[np.newaxis, ...]
+#         return tf.cast(pos_encoding, dtype=tf.float32)
 
     def call(self, inputs):
         """
@@ -178,9 +180,6 @@ class InceptionBlock2D(keras.layers.Layer):
 
 
 class DecompositionLayer(keras.layers.Layer):
-    """
-    이동 평균을 사용하여 시계열을 추세와 계절성 성분으로 분해합니다.
-    """
     def __init__(self, kernel_size, **kwargs):
         super(DecompositionLayer, self).__init__(**kwargs)
         self.kernel_size = kernel_size
@@ -191,9 +190,7 @@ class DecompositionLayer(keras.layers.Layer):
         seasonal = x - trend
         return seasonal, trend
 
-    # 💡 아래 메서드를 추가하여 오류를 해결합니다.
     def get_config(self):
-        """레이어의 설정을 직렬화(serialize)하기 위해 호출됩니다."""
         config = super(DecompositionLayer, self).get_config()
         config.update({"kernel_size": self.kernel_size})
         return config

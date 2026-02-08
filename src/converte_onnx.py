@@ -7,7 +7,7 @@ from src.models.layer import DecompositionLayer, FeatureWiseScalingLayer, gelu_a
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 seq_len = 50
-pred_distance = 0
+pred_distance = 30
 
 model_path = f'../outputs/checkpoints/model_seq_{seq_len}_pred_{pred_distance}_15m.keras'
 model = keras.models.load_model(filepath=model_path, custom_objects={'DecompositionLayer': DecompositionLayer,

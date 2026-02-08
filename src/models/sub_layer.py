@@ -1,5 +1,7 @@
+import os
+os.environ["KERAS_BACKEND"] = "jax"
+
 import keras
-import tensorflow as tf
 
 
 def count_divisions_by_two(num):
@@ -45,31 +47,31 @@ def transformer_decoder(inputs, encoder_outputs, head_size, num_heads, ff_dim, d
     return decoder_output
 
 
-def fft_for_period(x, k=2):
-    x_transposed = tf.transpose(x, perm=[0, 2, 1])  # tf.signal.rfft는 마지막 축에 대해 수행되므로, 축을 변경해야 함 [B, T, C] -> [B, C, T]
-    xf = tf.signal.rfft(x_transposed) # [B, C, F]
-
-    # 주파수 리스트 (진폭 기준)
-    frequency_list = tf.math.abs(xf)
-    frequency_list = tf.reduce_mean(frequency_list, axis=1) # [B, F]
-    frequency_list = tf.reduce_mean(frequency_list, axis=0) # [F]
-
-    # 첫 번째 주파수(DC 성분)는 무시
-    frequency_list = tf.tensor_scatter_nd_update(frequency_list, [[0]], [0.0])
-
-    _, top_list = tf.math.top_k(frequency_list, k=k)
-
-    # 주파수 인덱스를 주기로 변환
-    T = tf.cast(tf.shape(x)[1], dtype=tf.float32)
-    # 0으로 나누는 것을 방지하기 위해 작은 값(epsilon) 추가
-    period = T / (tf.cast(top_list, dtype=tf.float32) + 1e-8)
-    period = tf.cast(tf.math.round(period), dtype=tf.int32)
-
-    # top_k 주파수의 진폭(가중치) 계산
-    amplitudes = tf.math.abs(xf) # [B, C, F]
-    amplitudes = tf.reduce_mean(amplitudes, axis=1) # [B, F]
-    period_weight = tf.gather(amplitudes, top_list, axis=1) # [B, k]
-
+# def fft_for_period(x, k=2):
+#     x_transposed = keras.ops.transpose(x, perm=[0, 2, 1])  # tf.signal.rfft는 마지막 축에 대해 수행되므로, 축을 변경해야 함 [B, T, C] -> [B, C, T]
+#     xf = tf.signal.rfft(x_transposed) # [B, C, F]
+#
+#     # 주파수 리스트 (진폭 기준)
+#     frequency_list = keras.ops.abs(xf)
+#     frequency_list = keras.ops.mean(frequency_list, axis=1, keepdims=True) # [B, F]
+#     frequency_list = keras.ops.mean(frequency_list, axis=0, keepdims=True) # [F]
+#
+#     # 첫 번째 주파수(DC 성분)는 무시
+#     frequency_list = tf.tensor_scatter_nd_update(frequency_list, [[0]], [0.0])
+#
+#     _, top_list = tf.math.top_k(frequency_list, k=k)
+#
+#     # 주파수 인덱스를 주기로 변환
+#     T = tf.cast(tf.shape(x)[1], dtype=tf.float32)
+#     # 0으로 나누는 것을 방지하기 위해 작은 값(epsilon) 추가
+#     period = T / (tf.cast(top_list, dtype=tf.float32) + 1e-8)
+#     period = tf.cast(tf.math.round(period), dtype=tf.int32)
+#
+#     # top_k 주파수의 진폭(가중치) 계산
+#     amplitudes = tf.math.abs(xf) # [B, C, F]
+#     amplitudes = tf.reduce_mean(amplitudes, axis=1) # [B, F]
+#     period_weight = tf.gather(amplitudes, top_list, axis=1) # [B, k]
+#
     return period, period_weight
 
 
